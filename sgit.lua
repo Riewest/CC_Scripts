@@ -21,9 +21,6 @@ local logFile = "sgit.log"
 local logDir = "logs"
 local logPath = string.format("%s/%s", logDir, logFile)
 
--- I'm going to leave this here for if I ever decide to come back to it
--- ! currently this script will only get the newest version of github scripts after 5 minutes due to github's max-age=300
--- ! Sending this header does not fix the issue for some reason nor did `no-cache`, `no-store`, or `must-revalidate`
 local rawHeaders = {
     ["cache-control"] = "max-age=1",
 }
