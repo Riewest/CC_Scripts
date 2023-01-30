@@ -5,7 +5,7 @@ A common place for my computercraft scripts. Use the [sgit](sgit.lua) script to 
 <!-- TODO: Upload sgit to pastebin when stable and insert code here -->
 ## Setup
 ```lua
-pastebin get HuSsRvQw sgit
+pastebin get HuSsRvQw sgit.lua
 sgit
 -- Optionally run: sgit DIFFERENT_BRANCH
 ```
