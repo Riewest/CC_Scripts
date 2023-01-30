@@ -104,8 +104,6 @@ else
     error(err_msg)
 end
 
-
-
 local testCommand = "tests/sgit_test"
 testCommand = args[1] ?  testCommand .. " " .. args[1] : testCommand
 log("Running Test Command: " .. testCommand, LOG_LEVELS.debug)
