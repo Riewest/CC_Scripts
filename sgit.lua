@@ -21,6 +21,9 @@ local logFile = "sgit.log"
 local logDir = "logs"
 local logPath = string.format("%s/%s", logDir, logFile)
 
+
+
+
 local rawHeaders = {
     ["cache-control"] = "max-age=1",
 }
@@ -100,6 +103,13 @@ else
     log(err_msg)
     error(err_msg)
 end
+
+
+
+local testCommand = "tests/sgit_test"
+testCommand = args[1] ?  testCommand .. " " .. args[1] : testCommand
+log("Running Test Command: " .. testCommand, LOG_LEVELS.debug)
+shell.run(testCommand)
 
 if logFileEnabled then
     logFile.close()
