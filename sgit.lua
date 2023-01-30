@@ -105,7 +105,9 @@ else
 end
 
 local testCommand = "tests/sgit_test"
-testCommand = args[1] ?  testCommand .. " " .. args[1] : testCommand
+if args[1] then
+    testCommand = testCommand .. " " .. args[1]
+end
 log("Running Test Command: " .. testCommand, LOG_LEVELS.debug)
 shell.run(testCommand)
 
