@@ -17,9 +17,26 @@ sgit
 
   **Important: If you are loading this library from a separate sub directory you need to add the root dir to the package.path. See example below.**
   ```lua
-    -- Adds the root dir "/" to the lua path and loads squid
-    package.path = ";/?;/?.lua;/?/init.lua" .. package.path
-    local squid = require("squid")
+  -- Adds the root dir "/" to the lua path and loads squid
+  package.path = ";/?;/?.lua;/?/init.lua" .. package.path
+  local squid = require("squid")
+  ```
+
+  Example Imports:
+  ```lua
+  local squid = require("squid") -- Access to everything in the squid library
+  squid.util.findModem() -- Example Usage
+
+
+  local sturtle = require("squid/turtle") -- Access to everything in the turtle sub directory
+  sturtle.inv.findEmptySlot() -- Example Usage
+
+
+  local mygps = require("squid/turtle/gps") -- Access to only the turtle gps functions
+  mygps.gpsInit() -- Should be called when a turtle is turned on
+  local newLocation = vector.new(10,66,10)
+  local travelHeight = newLocation.y + 5
+  mygps.goTo(newLoc, travelHeight, "south") -- Travel to the above coords and face south when it gets there
   ```
 
 - ### [./helpers](helpers/) 
