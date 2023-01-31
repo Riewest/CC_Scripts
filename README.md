@@ -24,15 +24,18 @@ sgit
 
   Example Imports:
   ```lua
-  local squid = require("squid") -- Access to everything in the squid library
+  -- Access to everything in the squid library
+  local squid = require("squid") 
   squid.util.findModem() -- Example Usage
 
 
-  local sturtle = require("squid/turtle") -- Access to everything in the turtle sub directory
+  -- Access to everything in the turtle sub 
+  local sturtle = require("squid/turtle") directory
   sturtle.inv.findEmptySlot() -- Example Usage
 
 
-  local mygps = require("squid/turtle/gps") -- Access to only the turtle gps functions
+  -- Access to only the turtle gps functions
+  local mygps = require("squid/turtle/gps") 
   mygps.gpsInit() -- Should be called when a turtle is turned on
   local newLocation = vector.new(10,66,10)
   local travelHeight = newLocation.y + 5
