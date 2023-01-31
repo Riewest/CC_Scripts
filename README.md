@@ -4,8 +4,32 @@ A common place for my computercraft scripts. Use the [sgit](sgit.lua) script to 
 
 <!-- TODO: Upload sgit to pastebin when stable and insert code here -->
 ## Setup Computer/Turtle
+Run the following
 ```lua
 pastebin get HuSsRvQw sgit.lua
 sgit
 -- Optionally run: sgit DIFFERENT_BRANCH
 ```
+
+## Info
+- ### [./squid](squid/)
+  This is a common library for alot of the scripts in here and where new common code should be added. One of the more useful things in this library is the `squid.turtle.gps.goTo()` function which will allow the turtle to move to the given destination.
+
+  **Important: If you are loading this library from a separate sub directory you need to add the root dir to the package.path. See example below.**
+  ```lua
+    -- Adds the root dir "/" to the lua path and loads squid
+    package.path = ";/?;/?.lua;/?/init.lua" .. package.path
+    local squid = require("squid")
+  ```
+
+- ### [./helpers](helpers/) 
+  Useful one off scripts (example: gps-deploy)
+
+- ### [./ae2](ae2/) 
+  Programs for use with AppliedEnergistics2 mod
+
+- ### [./pastebins](pastebins/) 
+  Programs that also need to be kept up to date on pastebin
+
+- ### [./tests](tests/) 
+  Programs that are ran to test another's program functionality or show things are working as they should
