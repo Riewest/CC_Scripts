@@ -36,7 +36,7 @@ sgit
   mygps.gpsInit() -- Should be called when a turtle is turned on
   local newLocation = vector.new(10,66,10)
   local travelHeight = newLocation.y + 5
-  mygps.goTo(newLoc, travelHeight, "south") -- Travel to the above coords and face south when it gets there
+  mygps.goTo(newLocation, travelHeight, "south") -- Travel to the above coords and face south when it gets there
   ```
 
 - ### [./helpers](helpers/) 
