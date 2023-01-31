@@ -139,7 +139,7 @@ local function goTo(location, yLevel, face)
 	changeY(yChange)
 	local x = travel.x
 	local z = travel.z
-	print("X= " .. x, "Z= " .. z)
+	
 	if x > 0 then
 		turnTowards("east")
 	elseif x < 0 then
