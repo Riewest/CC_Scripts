@@ -1,4 +1,10 @@
-cluster_name = "ae2:quartz_cluster"
+local cluster_name = "ae2:quartz_cluster"
+local sleep_time = 10
+local dropSide = "back" -- Set to nil for no dropping
+
+
+package.path = package.path .. ";/?;/?.lua;/?/init.lua"
+st = require("squid/turtle")
 
 function checkCluster(inspect, dig, get_dust)
     b, info = inspect()
@@ -11,11 +17,13 @@ end
 while true do
     turtle.turnLeft()
     checkCluster(turtle.inspect, turtle.dig, true)
-    turtle.turnRight()
-    turtle.turnRight()
+    st.mv.spin()
     checkCluster(turtle.inspect, turtle.dig)
     turtle.turnLeft()
     checkCluster(turtle.inspectUp,turtle.digUp)
     checkCluster(turtle.inspectDown,turtle.digDown)
-    sleep(8)
+    if dropSide then
+        st.inv.emptyAllInv(dropSide)
+    end
+    sleep(10)
 end
