@@ -6,9 +6,7 @@ A common place for my computercraft scripts. Use the [sgit](sgit.lua) script to 
 ## Setup Computer/Turtle
 Run the following
 ```lua
-pastebin get HuSsRvQw sgit.lua
-sgit
--- Optionally run: sgit DIFFERENT_BRANCH
+pastebin run HuSsRvQw
 ```
 
 ## Info
