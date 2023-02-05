@@ -1,7 +1,7 @@
 local place_ = "left"
 local break_ = "right"
 local color_1 = "bottom"
-
+local redstone_input = "top"
 
 function rsOn(side)
     redstone.setOutput(side, true)
@@ -15,10 +15,16 @@ rsOff(break_)
 rsOff(color_1)
 sleep(.05)
 
-local toggle = true
 function cycle()
 while true do
-
+    while redstone.getInput(redstone_input) do        
+        term.clear()
+        term.setCursorPos(1,1)
+        print("Shutdown with redstone signal...")
+        sleep(5)
+    end
+    term.clear()
+    term.setCursorPos(1,1)
     rsOn(place_)
     sleep(.05)
     rsOn(color_1)
@@ -29,7 +35,6 @@ while true do
     rsOff(break_)
     rsOff(color_1)
     sleep(.05)
-    toggle = not toggle
 end
 end
 
