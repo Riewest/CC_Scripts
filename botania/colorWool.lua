@@ -13,7 +13,6 @@ end
 rsOff(place_)
 rsOff(break_)
 rsOff(color_1)
-rsOff(color_2)
 sleep(.05)
 
 local toggle = true
