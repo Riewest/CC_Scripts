@@ -24,7 +24,6 @@ end
 
 function process_slot(to_inv, from_inv, from_slot)
     to_inv.pullItems(peripheral.getName(from_inv), from_slot)
-    error("TESTING")
 end
 
 function process_pot(pot)
