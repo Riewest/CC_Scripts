@@ -9,7 +9,7 @@ local OUTPUT_INV = nil
 
 local SEED_SLOT = 2
 local SOIL_SLOT = 1
-local MINUTE = 2
+local MINUTE = 60
 local SLEEP_TIME = 2 * MINUTE 
 
 local SOIL_NAME_PATTERNS = {
