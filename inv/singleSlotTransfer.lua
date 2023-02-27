@@ -4,7 +4,6 @@ local from_inv_name = args[2] or "left"
 local to_inv_name = args[3] or "right"
 print(slot_num, from_inv_name, "->", to_inv_name)
 
-
 function help()
     print("USAGE: transfer [slotNum] [fromSide] [toSide]")
     print(" -slotNum defaults to 1")
@@ -32,8 +31,6 @@ function preCheck()
         invError(to_inv_name .. " Inventory Not Found!")
     end
 end
-
-
 
 function main()
     preCheck()

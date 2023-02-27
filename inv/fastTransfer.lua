@@ -1,7 +1,8 @@
 local args = {...}
 local from_inv_name = args[1] or "left"
 local to_inv_name = args[2] or "right"
-local createStartup = args[3] or "-n" -- set this to "-s" to install startup file automatically
+local slots_per_thread = tonumber(args[3]) or 5 
+local createStartup = args[4] or "-n" -- set this to "-s" to install startup file automatically
 
 
 local function installStartup()
@@ -41,20 +42,42 @@ function invError(message)
     error(message)
 end
 
-
+function getSlotRanges()
+    local from_inv = peripheral.wrap(from_inv_name)
+    local from_size = from_inv.size()
+    local slotRanges = {}
+    local numFullRange = math.floor(from_size / slots_per_thread)
+    local leftover = from_size % slots_per_thread
+    local slot = 1
+    for i=slot, from_size - leftover, slots_per_thread do
+        local range = {}
+        range.start_slot = i
+        range.end_slot = i + slots_per_thread - 1
+        table.insert(slotRanges, range)
+        slot = i + slots_per_thread
+    end
+    if leftover > 0 then
+        local range = {}
+        range.start_slot = slot
+        range.end_slot = slot + leftover - 1
+        table.insert(slotRanges, range)
+    end
+    return slotRanges
+end
 
 function main()
     preCheck()
     installStartup()
     local from_inv = peripheral.wrap(from_inv_name)
-    local from_size = from_inv.size()
+    local slotRanges = getSlotRanges()
     local transferShells = {}
-    for i=1, from_size do
-        local id = multishell.launch({}, "/inv/singleSlotTransfer.lua", tostring(i), from_inv_name, to_inv_name)
-        multishell.setTitle(id, "Slot: "..tostring(i))
+    for _, range in pairs(slotRanges) do
+        local id = multishell.launch({}, "/inv/slotRangeTransfer.lua", tostring(range.start_slot), tostring(range.end_slot), from_inv_name, to_inv_name)
+        multishell.setTitle(id, tostring(range.start_slot).."->"..tostring(range.end_slot))
         table.insert(transferShells, id)
     end
 end
+
 
 if string.find(string.lower(from_inv_name), "help") then
     help()
