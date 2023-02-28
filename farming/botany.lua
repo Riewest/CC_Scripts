@@ -1,7 +1,3 @@
-term.clear()
-term.setCursorPos(1,1)
-print("\"Mars will come to fear my botany powers\"")
-print("    - Mark Watney")
 local args = {...}
 local NO_INPUT = "XXXXXXXXXXXX"
 local INPUT_INV_NAME = args[1] or NO_INPUT
@@ -65,13 +61,15 @@ function process_inputs(empty_pots)
     local input_inv = peripheral.wrap(INPUT_INV_NAME)
     local seed_slot, seed_count = find_seed(input_inv)
     local soil_slot, soil_count = find_soil(input_inv)
+    local empty_pot_count = #empty_pots
     for _, pot in pairs(empty_pots) do
         if not seed_count or not soil_count then
-            return
+            break
         end
         if not pot.getItemDetail(SEED_SLOT) then
             pot.pullItems(peripheral.getName(input_inv), seed_slot, 1, SEED_SLOT)
             seed_count = seed_count - 1
+            empty_pot_count = empty_pot_count - 1
         end
         if not pot.getItemDetail(SOIL_SLOT) then
             pot.pullItems(peripheral.getName(input_inv), soil_slot, 1, SOIL_SLOT)
@@ -84,6 +82,7 @@ function process_inputs(empty_pots)
             soil_slot, soil_count = find_soil(input_inv)
         end
     end
+    return empty_pot_count
 end
 
 function process_pot(pot)
@@ -107,19 +106,28 @@ function process_pots(botany_pots)
             table.insert(empty_pots, pot)
         end
     end
-    process_inputs(empty_pots)
+    return process_inputs(empty_pots)
 end
 
 
 function main()
     find_output()
+    local botany_pots = {peripheral.find("botanypots:botany_pot")}
+    term.clear()
+    term.setCursorPos(1,1)
+    print("\"Mars will come to fear my botany powers\"")
+    print("    - Mark Watney")
     print("")
     print("Input Inv:", INPUT_INV_NAME)
     print("Output Inv:", peripheral.getName(OUTPUT_INV))
+    print("Maintaining:",#botany_pots,"pots.")
+    print("Empty Pots:","?")
     print("Seconds Between:", SLEEP_TIME)
-    local botany_pots = {peripheral.find("botanypots:botany_pot")}
     while true do
-        process_pots(botany_pots)
+        local empty_pot_count = process_pots(botany_pots)
+        term.setCursorPos(1,7)
+        term.clearLine()
+        print("Empty Pots:",empty_pot_count)
         sleep(SLEEP_TIME)
     end
 end
