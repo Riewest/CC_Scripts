@@ -99,8 +99,8 @@ function process_pot(pot)
     return has_seed
 end
 
-function process_pots()
-    local botany_pots = {peripheral.find("botanypots:botany_pot")}
+function process_pots(botany_pots)
+    
     local empty_pots = {}
     for _, pot in pairs(botany_pots) do
         if not process_pot(pot) then
@@ -114,10 +114,12 @@ end
 function main()
     find_output()
     print("")
+    print("Input Inv:", INPUT_INV_NAME)
     print("Output Inv:", peripheral.getName(OUTPUT_INV))
     print("Seconds Between:", SLEEP_TIME)
+    local botany_pots = {peripheral.find("botanypots:botany_pot")}
     while true do
-        process_pots()
+        process_pots(botany_pots)
         sleep(SLEEP_TIME)
     end
 end
