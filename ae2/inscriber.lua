@@ -13,6 +13,7 @@ PRESSES.engineering = MOD_ID .. ":engineering_processor_press"
 PRESSES.calculation = MOD_ID .. ":calculation_processor_press"
 PRESSES.silicon = MOD_ID .. ":silicon_press"
 local COMBINATION = "combine"
+local INTERFACE_NAME = MOD_ID .. ":interface"
 
 local MIDDLE_INPUTS = {}
 MIDDLE_INPUTS.logic = "minecraft:gold_ingot"
@@ -29,7 +30,9 @@ CIRCUITS.calculation = MOD_ID .. ":printed_calculation_processor"
 local SILICON = MOD_ID .. ":printed_silicon"
 
 local inventory = nil
+local interface = nil
 local inscribers = {}
+local output_inv = nil
 
 function hasMethod(p, method)
     local methods = peripheral.getMethods(p)
@@ -83,11 +86,22 @@ function findInventory()
     print("Looking For Inventory...")
     for _, v in pairs( peripheral.getNames() ) do
         if hasMethod(v, "size") and peripheral.call(v, "size") > 10 then
-            print("Found Inventory!")
+            print("Found Inventory:",v)
             return v
         end
     end
     print("No Inventory Found!")
+end
+
+function findInterface()
+    print("Looking For Interface...")
+    for _, v in pairs( peripheral.getNames() ) do
+        if hasMethod(v, "size") and string.match(v,INTERFACE_NAME) then
+            print("Found Interface:",v)
+            return v
+        end
+    end
+    print("No Interface Found!")
 end
 
 function moveItem(fromInv, fromSlot, toInv, toSlot )
@@ -132,7 +146,7 @@ end
 
 function processOutput()
     if inscribers[COMBINATION] then
-        moveItem(inscribers[COMBINATION].name, SLOTS.output, inventory)
+        moveItem(inscribers[COMBINATION].name, SLOTS.output, output_inv)
     end
 end
 
@@ -151,6 +165,12 @@ function startup()
     print("Initializing...")
     inscribers = findInscribers()
     inventory = findInventory()
+    interface = findInterface()
+    if interface then
+        output_inv = interface
+    else
+        output_inv = inventory
+    end
 end
 
 
