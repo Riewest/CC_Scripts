@@ -2,6 +2,8 @@
 
 A common place for my computercraft scripts. Use the [sgit](sgit.lua) script to download all scripts to a computercraft computer
 
+## [Old Scripts/Pastebin](https://pastebin.com/u/Riewest14)
+
 <!-- TODO: Upload sgit to pastebin when stable and insert code here -->
 ## Setup Computer/Turtle
 Run the following
