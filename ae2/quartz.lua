@@ -7,7 +7,7 @@ package.path = package.path .. ";/?;/?.lua;/?/init.lua"
 st = require("squid/turtle")
 
 function checkCluster(inspect, dig, get_dust)
-    b, info = inspect()
+    fuel_data, info = inspect()
 
     if get_dust or info.name == cluster_name then
         dig()
