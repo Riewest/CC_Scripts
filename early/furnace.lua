@@ -48,8 +48,9 @@ INV_INFO.fuel = {
     wrapped = nil
 }
 
-local FCDL = 7 --furnace count display line
-local CODL = 9 --Current Operation display_line
+local FCDL = 7  --furnace count display line
+local CODL = 9  --Current Operation display_line
+local CADL = 11 --curent action display_line
 
 local inventories = {}
 local furnaces = {}
@@ -62,8 +63,8 @@ function congfigureInventory(inv_in)
     checkInventoryList()
     local inv_name = settings.get(inv_in.setting)
     if (inv_name and peripheral.isPresent(inv_name) and not alreadyUsedInv(inv_name)) then --setting exists and peripheral is present
-        printOnLine(inv_in.type..": "..inv_name,inv_in.display_line)
-    else -- setting does not exist or peripheral is missing
+        printOnLine(inv_in.type .. ": " .. inv_name, inv_in.display_line)
+    else                                                                                   -- setting does not exist or peripheral is missing
         inv_name = findNewInventory(inv_in)
         settings.set(inv_in.setting, inv_name)
     end
@@ -75,44 +76,44 @@ end
 
 function findNewInventory(inv_in) --make generic function that takes in filter param?
     local new_inv = nil
-    printOnLine(inv_in.type.. ": Please connect an inventory...",inv_in.display_line)
+    printOnLine(inv_in.type .. ": Please connect an inventory...", inv_in.display_line)
     while not new_inv do
         local _, per_name = os.pullEvent("peripheral")
         if peripheral.hasType(per_name, INVENTORY) and not string.match(per_name, FURNACE) and not alreadyUsedInv(per_name) then
             new_inv = per_name
         end
     end
-    printOnLine(inv_in.type .. ": "..new_inv,inv_in.display_line)
+    printOnLine(inv_in.type .. ": " .. new_inv, inv_in.display_line)
     return new_inv
 end
 
-function printOnLine(message,line)
-    cPosX,cPosY = term.getCursorPos()
-    term.setCursorPos(1,line)
+function printOnLine(message, line)
+    cPosX, cPosY = term.getCursorPos()
+    term.setCursorPos(1, line)
     term.clearLine()
     print(message)
-    term.setCursorPos(cPosX,cPosY)
+    term.setCursorPos(cPosX, cPosY)
 end
 
 function checkInventoryList()
-    for k,v in pairs(inventories) do
+    for k, v in pairs(inventories) do
         if not peripheral.isPresent(v) then
-            table.remove(inventories,k)
+            table.remove(inventories, k)
         end
     end
 end
 
 function findFurnaces()
-    printOnLine("Looking For Furnaces...",FCDL)
+    printOnLine("Looking For Furnaces...", FCDL)
     while #furnaces < 1 do
         furnaces = { peripheral.find(INVENTORY, function(n, p)
             return string.match(n, FURNACE)
         end) }
         if #furnaces > 0 then
-            printOnLine("FURNACE(S): "..#furnaces,FCDL)
+            printOnLine("FURNACE(S): " .. #furnaces, FCDL)
             return furnaces
         end
-        printOnLine("Please connect a furnace...",FCDL)
+        printOnLine("Please connect a furnace...", FCDL)
         sleep(2)
     end
 end
@@ -137,10 +138,12 @@ end
 
 function slotHasFuelTag(inv, slot)
     local itemDetail = inv.getItemDetail(slot)
-    for tag, _ in pairs(itemDetail.tags) do
-        local fuel_data = FUELS[tag]
-        if fuel_data then
-            return fuel_data
+    if itemDetail then
+        for tag, _ in pairs(itemDetail.tags) do
+            local fuel_data = FUELS[tag]
+            if fuel_data then
+                return fuel_data
+            end
         end
     end
 end
@@ -150,9 +153,10 @@ function moveItem(fromInv, fromSlot, toInv, toSlot, count)
 end
 
 function fuelFurnaces()
-    printOnLine("Fueling Furnaces",CODL)
+    printOnLine("Fueling Furnaces", CODL)
     if INV_INFO.fuel.wrapped and peripheral.isPresent(peripheral.getName(INV_INFO.fuel.wrapped)) then
         for _, furnace in pairs(furnaces) do
+            printOnLine("Fueling:  " .. peripheral.getName(furnace), CADL)
             if not slotHasItem(furnace, SLOTS.fuel) then
                 local slot, fuel_data = findNextFuel()
                 --print(slot, fuel_data)
@@ -170,22 +174,45 @@ function slotHasItem(furnace, slot)
     return furnace.getItemDetail(slot)
 end
 
+function findNextInputStack(inputs, burn_power)
+    local out_slot = nil
+    for slot, item in pairs(inputs) do
+        --printOnLine(item.count..burn_power,CADL)
+        if item.count >= burn_power then
+            item.count = item.count - burn_power
+            if item.count < burn_power then
+                table.remove(inputs, slot)
+            end
+            return slot, burn_power, inputs
+        end
+    end
+    return out_slot, burn_power, inputs
+end
+
 function processInputs()
-    printOnLine("Processing Inputs",CODL)
+    printOnLine("Processing Inputs", CODL)
     if INV_INFO.input.wrapped and peripheral.isPresent(peripheral.getName(INV_INFO.input.wrapped)) then --
         local inputs = INV_INFO.input.wrapped.list()
-        if inputs then
-            for _, furnace in pairs(furnaces) do
-                for slot, item in pairs(inputs) do
-                    if not slotHasItem(furnace, SLOTS.input) and slotHasItem(furnace, SLOTS.fuel) then
-                        local fuel_data = slotHasFuelTag(furnace, SLOTS.fuel)
-                        local item_count = fuel_data.minStack * fuel_data.burnTime
-                        if item.count >= item_count then
-                            moveItem(INV_INFO.input.wrapped, slot, furnace, SLOTS.input, item_count)
-                            break
-                        end
+        --printOnLine(#inputs,CADL)
+
+        for _, furnace in pairs(furnaces) do
+            if #inputs > 0 then
+                printOnLine("Filling:  " .. peripheral.getName(furnace), CADL)
+                local fuel_data = slotHasFuelTag(furnace, SLOTS.fuel)
+                --printOnLine(fuel_data.burnTime..fuel_data.minStack,CADL)
+                --printOnLine(slotHasItem(furnace, SLOTS.input)..fuel_data,CADL+1)
+                if not slotHasItem(furnace, SLOTS.input) and fuel_data then
+                    local burn_power = fuel_data.minStack * fuel_data.burnTime
+                    local slot, count, updated_inputs = findNextInputStack(inputs, burn_power)
+                    inputs = updated_inputs
+                    if slot then
+                        moveItem(INV_INFO.input.wrapped, slot, furnace, SLOTS.input, count)
+                    else
+                        break
                     end
                 end
+            else
+                break
             end
         end
     else
@@ -194,9 +221,10 @@ function processInputs()
 end
 
 function processOutputs()
-    printOnLine("Processing Outputs",CODL)
+    printOnLine("Processing Outputs", CODL)
     if INV_INFO.output.wrapped and peripheral.isPresent(peripheral.getName(INV_INFO.output.wrapped)) then
         for _, furnace in pairs(furnaces) do
+            printOnLine("Emptying: " .. peripheral.getName(furnace), CADL)
             if slotHasItem(furnace, SLOTS.output) then
                 moveItem(furnace, SLOTS.output, INV_INFO.output.wrapped, nil, nil)
             end

@@ -19,7 +19,8 @@ local MIDDLE_INPUTS = {}
 MIDDLE_INPUTS.logic = "minecraft:gold_ingot"
 MIDDLE_INPUTS.engineering = "minecraft:diamond"
 MIDDLE_INPUTS.calculation = MOD_ID .. ":certus_quartz_crystal"
-MIDDLE_INPUTS.silicon = "ae2:silicon" --MAKE THIS MORE ROBUST FOR SILICON TYPES
+--MIDDLE_INPUTS.silicon = "ae2:silicon" --MAKE THIS MORE ROBUST FOR SILICON TYPES
+MIDDLE_INPUTS.silicon = "refinedstorage:silicon" --MAKE THIS MORE ROBUST FOR SILICON TYPES
 MIDDLE_INPUTS.combine = "minecraft:redstone"
 
 local CIRCUITS = {}

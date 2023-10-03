@@ -3,15 +3,28 @@ if not turtle then
     return
 end
 
+--ADD TOUCH START CODE FOR QUICK RESTARTS
+
 local tArgs = { ... }
-if #tArgs ~= 1 then
+local dumpTrashList = {
+    "minecraft:cobbled_deepslate",
+    "minecraft:dirt",
+    "minecraft:cobblestone",
+    "minecraft:tuff",
+    "minecraft:netherrack",
+    "byg:soapstone",
+    "xycraft_world:kivi"
+}
+if not(#tArgs == 1 or #tArgs == 2) then
     local programName = arg[0] or fs.getName(shell.getRunningProgram())
-    print("Usage: " .. programName .. " <diameter>")
+    print("Usage: " .. programName .. " <diameter> [dumpTrash (bool)]")
     return
 end
 
 -- Mine in a quarry pattern until we hit something we can't dig
 local size = tonumber(tArgs[1])
+local dumpTrash = tArgs[2] or false
+
 if size < 1 then
     print("Excavate diameter must be positive")
     return
@@ -68,6 +81,31 @@ local function returnSupplies()
     goTo(x, y, z, xd, zd)
 end
 
+local function dumpTrash()
+    local trashDumped = false
+    local stacksDumped = 0
+    print("Dumping trash blocks...")
+    for n = 1, 16 do
+        turtle.select(n)
+        local iTable = turtle.getItemDetail(n)
+        for k,v in pairs(dumpTrashList) do
+            for l,b in pairs(iTable) do 
+                if l=="name" then
+                    if v == b then
+                        turtle.dropUp()
+                        stacksDumped = stacksDumped + 1
+                    end
+                end
+            end
+        end
+    end
+    print("Dumped "..stacksDumped.." stacks.")
+    if stacksDumped > 1 then
+        trashDumped = true
+    end
+    return trashDumped
+end
+
 local function collect()
     local bFull = true
     local nTotalItems = 0
@@ -88,6 +126,9 @@ local function collect()
 
     if bFull then
         print("No empty slots left.")
+        if dumpTrash then
+            return dumpTrash()
+        end
         return false
     end
     return true
