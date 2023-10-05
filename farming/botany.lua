@@ -8,6 +8,13 @@ local SOIL_SLOT = 1
 local MINUTE = 60
 local SLEEP_TIME = 2 * MINUTE 
 
+local VALID_OUTPUTS = {
+    "chest",
+    "barrel",
+    "interface",
+    "backpack"
+}
+
 local SOIL_NAME_PATTERNS = {
     "farmland",
     "dirt",
@@ -16,7 +23,7 @@ local SOIL_NAME_PATTERNS = {
 
 function find_output()
     local possible_outputs = { peripheral.find("inventory", function(name, p)
-        return (string.find(name, "chest") or string.find(name, "barrel") or string.find(name, "interface")) and not string.find(name, INPUT_INV_NAME)
+        return (string.find(name, "chest") or string.find(name, "barrel") or string.find(name, "interface") or string.find(name, "backpack")) and not string.find(name, INPUT_INV_NAME)
     end) }
     local first_output = possible_outputs[1]
     if not first_output then
@@ -108,6 +115,11 @@ function process_pots(botany_pots)
     end
     return process_inputs(empty_pots)
 end
+
+--ADD EVENT LOOKING FOR BUTTON PRESS TO FORCE START
+--add list of valid outputs (add backpack) 
+--autocycle through all the pots (10 min divide by pot number or something)
+
 
 
 function main()
