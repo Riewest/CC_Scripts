@@ -14,9 +14,7 @@ local function main()
     machine.create_machine_schema({3,4}, "sim_chamber")
     machine.create_input_item_schema(2, 1, prediction_filter)
     machine.create_extra_item_schema(1, 1, model_filter)
-    machine.print_machine_schema()
     machine.main()
-    machine.print_machines()
 end
 
 main()

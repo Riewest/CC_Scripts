@@ -22,14 +22,27 @@ local extra_input_inv = nil
 local current_extra_stack = nil
 local current_input_stack = nil
 
-local function print_program_info()
+local function reprintLine(line,...)
+    local print_string = table.concat(arg, " ")
+    term.setCursorPos(1,line)
+    term.clearLine()
+    print(print_string)
+end
+
+local function print_static_program_info()
     term.clear()
-    term.setCursorPos(1,1)
-    print("Program Info:")
-    term.setCursorPos(1,2)
-    print("  Machine Type:", machine_schema.ID_STR)
-    term.setCursorPos(1,3)
-    print("  Count:", #machines )
+    reprintLine(1, "Program Info:")
+    reprintLine(2, "  Machine Type:", machine_schema.ID_STR)
+    reprintLine(3, "  Count:", #machines )
+end
+
+local function print_dynamic_program_info()
+    
+end
+
+local function print_current_machine_info(machine)
+    local machine_name = peripheral.getName(machine)
+    reprintLine(8," Tending To: "..string.sub(machine_name,19,string.len(machine_name)))
 end
 
 
@@ -182,6 +195,7 @@ end
 
 local function process_machines()
     for _, machine in pairs(machines) do
+        print_current_machine_info(machine)
         process_machine(machine)
     end
 end
@@ -202,7 +216,7 @@ end
 
 local function main()
     startup()
-    print_program_info()
+    print_static_program_info()
     while true do
         process_machines()
     end
