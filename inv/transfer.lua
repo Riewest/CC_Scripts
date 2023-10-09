@@ -2,6 +2,7 @@ local args = {...}
 local from_inv_name = args[1] or "left"
 local to_inv_name = args[2] or "right"
 local sleep_cycle = tonumber(args[3]) or 0
+local tag = args[4] or nil
 local START_DELAY = 4
 local sleep_display = tostring(sleep_cycle).." sec"
 
@@ -34,6 +35,12 @@ function preCheck()
 end
 
 function process_slot(to_inv, from_inv, from_slot)
+    if tag then
+        local slotDetail = from_inv.getItemDetail(from_slot)
+        if not slotDetail["tags"] or not slotDetail["tags"][tag] then
+            return
+        end
+    end
     to_inv.pullItems(peripheral.getName(from_inv), from_slot)
 end
 
