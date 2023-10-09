@@ -22,6 +22,17 @@ local extra_input_inv = nil
 local current_extra_stack = nil
 local current_input_stack = nil
 
+local function print_program_info()
+    term.clear()
+    term.setCursorPos(1,1)
+    print("Program Info:")
+    term.setCursorPos(1,2)
+    print("  Machine Type:", machine_schema.ID_STR)
+    term.setCursorPos(1,3)
+    print("  Count:", #machines )
+end
+
+
 local function check_valid_schema()
     if not schema_created then
         error("No Schema Created!\nBe Sure to call: create_machine_schema(...)")
@@ -191,6 +202,7 @@ end
 
 local function main()
     startup()
+    print_program_info()
     while true do
         process_machines()
     end
