@@ -12,7 +12,7 @@ local function main()
     local input_inv = "minecraft:barrel_3"
     machine.set_inventories(input_inv, output_inv, extra_input_inv)
     machine.create_machine_schema({3,4}, "sim_chamber")
-    machine.create_input_item_schema(2, 1, prediction_filter)
+    machine.create_input_item_schema(2, nil, prediction_filter)
     machine.create_extra_item_schema(1, 1, model_filter)
     machine.main()
 end
