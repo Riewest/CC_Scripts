@@ -56,6 +56,7 @@ local function check_valid_schema()
     expect("EXTRA_SLOT", machine_schema.EXTRA_SLOT, "number", "nil")
     expect("ID_STR", machine_schema.ID_STR, "string")
     expect("PERIPHERAL_TYPE", machine_schema.PERIPHERAL_TYPE, "string", "nil")
+    expect("PROCESS_TIME", machine_schema.PROCESS_TIME, "number")
     print("Valid Machine Schema")
 end
 
