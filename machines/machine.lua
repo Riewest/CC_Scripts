@@ -140,14 +140,7 @@ end
 
 local function get_input_item()
     local minCount = machine_schema.INPUT_MIN_STACK or 1
-    if not current_input_stack then
-        current_input_stack = get_next_item(input_inv, minCount, machine_schema.INPUT_FILTER_FUNC)
-    else
-        local input_stack = input_inv.getItemDetail(current_input_stack.slot)
-        if not input_stack or (input_stack and input_stack.count < minCount) then
-            current_input_stack = get_next_item(input_inv, minCount, machine_schema.INPUT_FILTER_FUNC)
-        end
-    end
+    current_input_stack = get_next_item(input_inv, minCount, machine_schema.INPUT_FILTER_FUNC)
     if current_input_stack and current_input_stack.count >= minCount then
         local returnItem = current_input_stack
         current_input_stack.count = returnItem.count - minCount
