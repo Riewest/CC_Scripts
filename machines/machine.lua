@@ -11,7 +11,8 @@ local machine_schema = {
     EXTRA_MIN_STACK = nil,
     EXTRA_FILTER_FUNC = nil,
     ID_STR = nil, -- Used for doing "string.match" on the peripheral names when finding machines
-    PERIPHERAL_TYPE = "inventory" -- Used as first parameter in "peripheral.find"
+    PERIPHERAL_TYPE = "inventory", -- Used as first parameter in "peripheral.find"
+    PROCESS_TIME = 1 -- Sleep time after processing a machine
 }
 
 local machines = {}
@@ -55,6 +56,7 @@ local function check_valid_schema()
     expect("EXTRA_SLOT", machine_schema.EXTRA_SLOT, "number", "nil")
     expect("ID_STR", machine_schema.ID_STR, "string")
     expect("PERIPHERAL_TYPE", machine_schema.PERIPHERAL_TYPE, "string", "nil")
+    expect("PROCESS_TIME", machine_schema.PROCESS_TIME, "number")
     print("Valid Machine Schema")
 end
 
@@ -90,6 +92,12 @@ local function create_extra_item_schema(slot, minStack, filter_func)
     machine_schema.EXTRA_SLOT = slot
     machine_schema.EXTRA_MIN_STACK = minStack
     machine_schema.EXTRA_FILTER_FUNC = filter_func
+end
+
+local function set_process_time(process_time)
+    expect(1, process_time, "number")
+    range(process_time, 1, 1000)
+    machine_schema.PROCESS_TIME = process_time
 end
 
 local function print_machines()
@@ -197,6 +205,7 @@ local function process_machines()
     for _, machine in pairs(machines) do
         print_current_machine_info(machine)
         process_machine(machine)
+        sleep(machine_schema.PROCESS_TIME)
     end
 end
 
@@ -229,7 +238,8 @@ local public = {
     create_input_item_schema = create_input_item_schema,
     print_machine_schema = print_machine_schema,
     print_machines = print_machines,
-    set_inventories = set_inventories
+    set_inventories = set_inventories,
+    set_process_time = set_process_time
 }
 
 return public
