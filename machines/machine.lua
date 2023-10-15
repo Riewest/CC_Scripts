@@ -1,4 +1,5 @@
 local expect = require "cc.expect"
+local completion = require "cc.completion"
 local expect, field, range = expect.expect, expect.field, expect.range
 
 local schema_created = false
@@ -209,6 +210,39 @@ local function process_machines()
     end
 end
 
+local function getAllInventories()
+    local allInventtories = {}
+    peripheral.find("inventory", function(name, modem)
+        table.insert(allInventtories, name)end)
+    return allInventtories
+end
+
+function getUserChoiceFromTable(table,match_table)
+    local x,y = term.getCursorPos()
+    local choice = ""
+    if match_table then
+        while not tableContains(table,choice) do
+            term.setCursorPos(x,y)
+            choice = read(nil, table, function(text) return completion.choice(text, table) end,table[1])
+        end
+    else
+        while choice == "" do
+            term.setCursorPos(x,y)
+            choice = read(nil, table, function(text) return completion.choice(text, table) end)
+        end
+    end
+    return choice
+end
+
+function tableContains(table, check_value)
+    for _,value in pairs(table) do
+        if value == check_value then 
+            return true
+        end
+    end
+    return false
+end
+
 local function set_inventories(inputInvName, outputInvName, extraInputInvName)
     expect(1, inputInvName, "string")
     expect(2, outputInvName, "string")
@@ -218,12 +252,74 @@ local function set_inventories(inputInvName, outputInvName, extraInputInvName)
     input_inv = peripheral.wrap(inputInvName)
 end
 
+local function setupInventorySettings()
+    local schema_settings_path = machine_schema.ID_STR..".settings"
+    local schema_input_setting = machine_schema.ID_STR..".input"
+    local schema_output_setting = machine_schema.ID_STR..".output"
+    local schema_extra_setting = machine_schema.ID_STR..".extra"
+    local inputInvName = nil
+    local outputInvName = nil
+    local extraInputInvName = nil
+    local potentialIO = getAllInventories()
+    -- for _,v in pairs(potentialIO) do 
+    --     print(v)
+    -- end
+
+    if #potentialIO < 1 then
+        print("No peripherals connected. Please connect a machine and try again.")
+        exit()
+    end
+    write("Select Input Inv: ")
+    inputInvName = getUserChoiceFromTable(potentialIO,true) 
+    write("Select Output Inv: ")
+    outputInvName = getUserChoiceFromTable(potentialIO,true) 
+    write("Select Extra Inv: ")
+    extraInputInvName = getUserChoiceFromTable(potentialIO,true) 
+    -- print(inputInvName,outputInvName,extraInputInvName)
+    settings.define(schema_input_setting)
+    settings.define(schema_output_setting)
+    settings.define(schema_extra_setting)
+    settings.set(schema_input_setting,inputInvName)
+    settings.set(schema_output_setting,outputInvName)
+    settings.set(schema_extra_setting,extraInputInvName)
+    settings.save(schema_settings_path)
+    settings.load(schema_settings_path)
+end
+
+local function find_inventories()
+    local schema_settings_path = machine_schema.ID_STR..".settings"
+    local schema_input_setting = machine_schema.ID_STR..".input"
+    local schema_output_setting = machine_schema.ID_STR..".output"
+    local schema_extra_setting = machine_schema.ID_STR..".extra"
+    
+    settings.load(schema_settings_path)
+    local inputInvName = settings.get(schema_input_setting)
+    local outputInvName = settings.get(schema_output_setting)
+    local extraInputInvName = settings.get(schema_extra_setting)
+    -- print(inputInvName,outputInvName)
+    if not inputInvName or not outputInvName then 
+        -- print("deleting schema settings file.")
+        fs.delete(schema_settings_path)
+    end
+    while not settings.load(schema_settings_path) do
+        setupInventorySettings()
+    end
+    inputInvName = settings.get(schema_input_setting)
+    outputInvName = settings.get(schema_output_setting)
+    extraInputInvName = settings.get(schema_extra_setting)
+    print(inputInvName,outputInvName,extraInputInvName)
+    return inputInvName,outputInvName,extraInputInvName
+end
+
 local function startup()
     check_valid_schema()
+    set_inventories(find_inventories())
     find_machines()
 end
 
 local function main()
+    term.setCursorPos(1,1)
+    term.clear()
     startup()
     print_static_program_info()
     while true do
