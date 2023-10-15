@@ -96,7 +96,7 @@ end
 
 local function set_process_time(process_time)
     expect(1, process_time, "number")
-    range(process_time, 1, 1000)
+    range(process_time, 0.05, 1000)
     machine_schema.PROCESS_TIME = process_time
 end
 
@@ -150,14 +150,7 @@ end
 
 local function get_extra_item()
     local minCount = machine_schema.EXTRA_MIN_STACK or 1
-    if not current_extra_stack then
-        current_extra_stack = get_next_item(extra_input_inv, minCount, machine_schema.EXTRA_FILTER_FUNC)
-    else
-        local extra_stack = extra_input_inv.getItemDetail(current_extra_stack.slot)
-        if not extra_stack or (extra_stack and extra_stack.count < minCount) then
-            current_extra_stack = get_next_item(extra_input_inv, minCount, machine_schema.EXTRA_FILTER_FUNC)
-        end
-    end
+    current_extra_stack = get_next_item(extra_input_inv, minCount, machine_schema.EXTRA_FILTER_FUNC)
     if current_extra_stack and current_extra_stack.count >= minCount then
         local returnItem = current_extra_stack
         current_extra_stack.count = returnItem.count - minCount
@@ -207,7 +200,10 @@ local function set_inventories(inputInvName, outputInvName, extraInputInvName)
     expect(2, outputInvName, "string")
     expect(3, extraInputInvName, "string", "nil")
     output_inv = peripheral.wrap(outputInvName)
-    extra_input_inv = peripheral.wrap(extraInputInvName)
+    extra_input_inv = nil
+    if extraInputInvName then
+        extra_input_inv = peripheral.wrap(extraInputInvName)
+    end
     input_inv = peripheral.wrap(inputInvName)
 end
 
