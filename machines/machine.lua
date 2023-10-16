@@ -17,6 +17,7 @@ local machine_schema = {
 }
 
 local machines = {}
+local potentialIO = {}
 local output_inv = nil
 local input_inv = nil
 local extra_input_inv = nil
@@ -24,18 +25,26 @@ local extra_input_inv = nil
 local current_extra_stack = nil
 local current_input_stack = nil
 
+local parallel_var = nil
+
 local function reprintLine(line,...)
+    local x,y = term.getCursorPos()
     local print_string = table.concat(arg, " ")
     term.setCursorPos(1,line)
     term.clearLine()
     print(print_string)
+    term.setCursorPos(x,y)
 end
 
 local function print_static_program_info()
     term.clear()
     reprintLine(1, "Program Info:")
     reprintLine(2, "  Machine Type:", machine_schema.ID_STR)
-    reprintLine(3, "  Count:", #machines )
+    reprintLine(3, "  Count:       ", #machines )
+    reprintLine(5, "  Input Inv:   ", peripheral.getName(input_inv))
+    reprintLine(6, "  Output Inv:  ", peripheral.getName(output_inv))
+    reprintLine(7, "  Extra Inv:   ", peripheral.getName(extra_input_inv))
+
 end
 
 local function print_dynamic_program_info()
@@ -44,7 +53,8 @@ end
 
 local function print_current_machine_info(machine)
     local machine_name = peripheral.getName(machine)
-    reprintLine(8," Tending To: "..string.sub(machine_name,19,string.len(machine_name)))
+    --reprintLine(7,machine_name)
+    reprintLine(9," Tending To:    "..string.sub(machine_name,17,string.len(machine_name)))
 end
 
 
@@ -196,11 +206,14 @@ local function process_machines()
     end
 end
 
-local function getAllInventories()
-    local allInventtories = {}
+local function getNonMachineInvs(machine_id)
+    local inventories = {}
     peripheral.find("inventory", function(name, modem)
-        table.insert(allInventtories, name)end)
-    return allInventtories
+        if not string.find(name, machine_id) then
+            table.insert(inventories, name)
+        end
+    end)
+    return inventories
 end
 
 function getUserChoiceFromTable(table,match_table)
@@ -209,7 +222,7 @@ function getUserChoiceFromTable(table,match_table)
     if match_table then
         while not tableContains(table,choice) do
             term.setCursorPos(x,y)
-            choice = read(nil, table, function(text) return completion.choice(text, table) end,table[1])
+            choice = read(nil, table, function(text) return completion.choice(text, table) end)
         end
     else
         while choice == "" do
@@ -217,7 +230,8 @@ function getUserChoiceFromTable(table,match_table)
             choice = read(nil, table, function(text) return completion.choice(text, table) end)
         end
     end
-    return choice
+    parallel_var = choice
+    --return choice
 end
 
 function tableContains(table, check_value)
@@ -241,6 +255,29 @@ local function set_inventories(inputInvName, outputInvName, extraInputInvName)
     input_inv = peripheral.wrap(inputInvName)
 end
 
+local function getPeripheralAttach()
+    local machine_id = machine_schema.ID_STR
+    local event = nil
+    local side = machine_id
+    while string.find(side, machine_id) do
+        event, side = os.pullEvent("peripheral")
+    end
+    write(side)
+    table.insert(potentialIO,side)
+    parallel_var = side
+end
+
+local function validateSettings(settingsNameTable)
+    for _,name in pairs(settingsNameTable) do
+
+        if not peripheral.isPresent(name) then
+            reprintLine(18,"Missing Inventories! Please set them up again.")
+            return false
+        end
+    end
+    return true
+end
+
 local function setupInventorySettings()
     local schema_settings_path = machine_schema.ID_STR..".settings"
     local schema_input_setting = machine_schema.ID_STR..".input"
@@ -249,22 +286,30 @@ local function setupInventorySettings()
     local inputInvName = nil
     local outputInvName = nil
     local extraInputInvName = nil
-    local potentialIO = getAllInventories()
-    -- for _,v in pairs(potentialIO) do 
-    --     print(v)
-    -- end
-
-    if #potentialIO < 1 then
-        print("No peripherals connected. Please connect a machine and try again.")
-        exit()
+    
+    reprintLine(1,"Press Enter to begin setup...")
+    while true do 
+        local event,key,is_held = os.pullEvent("key")
+        if key == keys.enter then
+            reprintLine(1,"Select or Connect Inventories:")
+            break
+        end
     end
-    write("Select Input Inv: ")
-    inputInvName = getUserChoiceFromTable(potentialIO,true) 
-    write("Select Output Inv: ")
-    outputInvName = getUserChoiceFromTable(potentialIO,true) 
-    write("Select Extra Inv: ")
-    extraInputInvName = getUserChoiceFromTable(potentialIO,true) 
-    -- print(inputInvName,outputInvName,extraInputInvName)
+    potentialIO = getNonMachineInvs(machine_schema.ID_STR)
+    write("Input:  ")
+    parallel.waitForAny(function() getUserChoiceFromTable(potentialIO,true) end,function() getPeripheralAttach() print("") end)
+    --print(parallel_var)
+    inputInvName = parallel_var
+    write("Output: ")
+    parallel.waitForAny(function() getUserChoiceFromTable(potentialIO,true) end,function() getPeripheralAttach() print("") end)
+    --print(parallel_var)
+    outputInvName = parallel_var
+    write("Extra:  ")
+    parallel.waitForAny(function() getUserChoiceFromTable(potentialIO) end,function() getPeripheralAttach() print("") end)
+    --print(parallel_var)
+    extraInputInvName = parallel_var
+    --print(inputInvName,outputInvName,extraInputInvName)
+    settings.clear()
     settings.define(schema_input_setting)
     settings.define(schema_output_setting)
     settings.define(schema_extra_setting)
@@ -290,13 +335,13 @@ local function find_inventories()
         -- print("deleting schema settings file.")
         fs.delete(schema_settings_path)
     end
-    while not settings.load(schema_settings_path) do
+    while not (settings.load(schema_settings_path) and validateSettings({inputInvName,outputInvName,extraInputInvName})) do
         setupInventorySettings()
+        inputInvName = settings.get(schema_input_setting)
+        outputInvName = settings.get(schema_output_setting)
+        extraInputInvName = settings.get(schema_extra_setting)
     end
-    inputInvName = settings.get(schema_input_setting)
-    outputInvName = settings.get(schema_output_setting)
-    extraInputInvName = settings.get(schema_extra_setting)
-    print(inputInvName,outputInvName,extraInputInvName)
+
     return inputInvName,outputInvName,extraInputInvName
 end
 
