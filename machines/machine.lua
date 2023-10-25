@@ -2,30 +2,57 @@ local expect = require "cc.expect"
 local completion = require "cc.completion"
 local expect, field, range = expect.expect, expect.field, expect.range
 
-local schema_created = false
-local machine_schema = {
-    INPUT_SLOT = nil,
-    INPUT_MIN_STACK = nil,
-    INPUT_FILTER_FUNC = nil,
-    OUTPUT_SLOTS = nil,
-    EXTRA_SLOT = nil,
-    EXTRA_MIN_STACK = nil,
-    EXTRA_FILTER_FUNC = nil,
-    ID_STR = nil, -- Used for doing "string.match" on the peripheral names when finding machines
-    PERIPHERAL_TYPE = "inventory", -- Used as first parameter in "peripheral.find"
-    PROCESS_TIME = 1 -- Sleep time after processing a machine
-}
+YES_NO_CHOICE = {"yes", "no"}
 
-local machines = {}
-local potentialIO = {}
-local output_inv = nil
-local input_inv = nil
-local extra_input_inv = nil
 
-local current_extra_stack = nil
-local current_input_stack = nil
+-- Merge table2 into table1
+local function mergeTables(table1, table2)
+    for key, value in pairs(table2) do
+        table1[key] = value
+    end
+end
 
-local parallel_var = nil
+local function parsePeripheralName(p)
+    if type(p) == "table" then
+        p = peripheral.getName(p)
+    end
+    -- Match mod
+    local mod = p:match("([^:]+)")
+    
+    -- Match name
+    local name = p:match(":(.-)_%d")
+    
+    -- Match number
+    local number = p:match("(%d+)$")
+    return mod, name, number
+end
+
+local function move_from(fromInvName, fromSlot, toInv, toSlot, count)
+    local fromInv = peripheral.wrap(fromInvName)
+    fromInv.pushItems(peripheral.getName(toInv), fromSlot, count, toSlot)
+end
+
+local function getItem(invName, slot_info, machine)
+    local inv = peripheral.wrap(invName)
+    local items = inv.list()
+    for slot, item in pairs(items) do
+        if item then
+            local moveItem, moveCount = slot_info.filter_func(inv, slot, item, machine)
+            if moveItem then -- Run the filter function if it exists, pass in the inv, slot and item variables
+                item.slot = slot -- Injects the slot into the item table because thats useful
+                return item, moveCount
+            end
+        end
+    end
+end
+
+local function slotHasItem(p, slot)
+    return p.getItemDetail(slot)
+end
+
+local function defaultFilter(inv, slot, item)
+    return true, nil
+end
 
 local function reprintLine(line,...)
     local x,y = term.getCursorPos()
@@ -34,176 +61,6 @@ local function reprintLine(line,...)
     term.clearLine()
     print(print_string)
     term.setCursorPos(x,y)
-end
-
-local function print_static_program_info()
-    term.clear()
-    reprintLine(1, "Program Info:")
-    reprintLine(2, "  Machine Type:", machine_schema.ID_STR)
-    reprintLine(3, "  Count:       ", #machines )
-    reprintLine(5, "  Input Inv:   ", peripheral.getName(input_inv))
-    reprintLine(6, "  Output Inv:  ", peripheral.getName(output_inv))
-    reprintLine(7, "  Extra Inv:   ", peripheral.getName(extra_input_inv))
-
-end
-
-local function print_dynamic_program_info()
-    
-end
-
-local function print_current_machine_info(machine)
-    local machine_name = peripheral.getName(machine)
-    --reprintLine(7,machine_name)
-    reprintLine(9," Tending To:    "..string.sub(machine_name,17,string.len(machine_name)))
-end
-
-
-local function check_valid_schema()
-    if not schema_created then
-        error("No Schema Created!\nBe Sure to call: create_machine_schema(...)")
-    end
-    expect("INPUT_SLOT", machine_schema.INPUT_SLOT, "number")
-    expect("OUTPUT_SLOTS", machine_schema.OUTPUT_SLOTS, "table")
-    expect("EXTRA_SLOT", machine_schema.EXTRA_SLOT, "number", "nil")
-    expect("ID_STR", machine_schema.ID_STR, "string")
-    expect("PERIPHERAL_TYPE", machine_schema.PERIPHERAL_TYPE, "string", "nil")
-    expect("PROCESS_TIME", machine_schema.PROCESS_TIME, "number")
-    print("Valid Machine Schema")
-end
-
-local function create_machine_schema(outputSlots, id_string, peripheral_type)
-    expect(1, outputSlots, "number", "table")
-    expect(3, id_string, "string")
-    expect(4, peripheral_type, "string", "nil")
-    if type(outputSlots) == "number" then
-        range(outputSlots, 1, 1000)
-        outputSlots = {outputSlots}
-    end
-    machine_schema.OUTPUT_SLOTS = outputSlots
-    machine_schema.ID_STR = id_string
-    machine_schema.PERIPHERAL_TYPE = peripheral_type or machine_schema.PERIPHERAL_TYPE
-    schema_created = true
-end
-
-local function create_input_item_schema(slot, minStack, filter_func)
-    expect(1, slot, "number")
-    expect(2, minStack, "number", "nil")
-    expect(3, filter_func, "function", "nil")
-    range(slot, 1, 1000)
-    machine_schema.INPUT_SLOT = slot
-    machine_schema.INPUT_MIN_STACK = minStack
-    machine_schema.INPUT_FILTER_FUNC = filter_func
-end
-
-local function create_extra_item_schema(slot, minStack, filter_func)
-    expect(1, slot, "number")
-    expect(2, minStack, "number", "nil")
-    expect(3, filter_func, "function", "nil")
-    range(slot, 1, 1000)
-    machine_schema.EXTRA_SLOT = slot
-    machine_schema.EXTRA_MIN_STACK = minStack
-    machine_schema.EXTRA_FILTER_FUNC = filter_func
-end
-
-local function set_process_time(process_time)
-    expect(1, process_time, "number")
-    range(process_time, 0.05, 1000)
-    machine_schema.PROCESS_TIME = process_time
-end
-
-local function print_machines()
-    for count, machine in pairs(machines) do
-        print(count, peripheral.getName(machine))
-    end
-end
-
-local function print_machine_schema()
-    for k, v in pairs(machines) do
-        print(k, v)
-    end
-end
-
-local function find_machines()
-    machines = { peripheral.find(machine_schema.PERIPHERAL_TYPE, function(n, p)
-        return string.match(n, machine_schema.ID_STR)
-    end) }
-end
-
-local function move_from(fromInv, fromSlot, toInv, toSlot, count)
-    fromInv.pushItems(peripheral.getName(toInv), fromSlot, count, toSlot)
-end
-
-local function slotHasItem(p, slot)
-    return p.getItemDetail(slot)
-end
-
-local function get_next_item(inv, minCount, filter_func)
-    local items = inv.list()
-    for slot, item in pairs(items) do
-        if item and item.count >= minCount then
-            if (filter_func and filter_func(inv, slot, item)) or not filter_func then -- Run the filter function if it exists, pass in the inv, slot and item variables
-                item.slot = slot -- Injects the slot into the item table because thats useful
-                return item
-            end
-        end
-    end
-end
-
-local function get_input_item()
-    local minCount = machine_schema.INPUT_MIN_STACK or 1
-    current_input_stack = get_next_item(input_inv, minCount, machine_schema.INPUT_FILTER_FUNC)
-    if current_input_stack and current_input_stack.count >= minCount then
-        local returnItem = current_input_stack
-        current_input_stack.count = returnItem.count - minCount
-        return returnItem
-    end
-end
-
-local function get_extra_item()
-    local minCount = machine_schema.EXTRA_MIN_STACK or 1
-    current_extra_stack = get_next_item(extra_input_inv, minCount, machine_schema.EXTRA_FILTER_FUNC)
-    if current_extra_stack and current_extra_stack.count >= minCount then
-        local returnItem = current_extra_stack
-        current_extra_stack.count = returnItem.count - minCount
-        return returnItem
-    end
-end
-
-local function process_output(machine)
-    for _, slot in pairs(machine_schema.OUTPUT_SLOTS) do
-        if slotHasItem(machine, slot) then
-            move_from(machine, slot, output_inv, nil, nil)
-        end
-    end
-end
-
-
-local function process_machine(machine)
-    -- Process OutputSlots
-    process_output(machine)
-
-    -- Process ExtraSlot (If there is one)
-    if machine_schema.EXTRA_SLOT and not slotHasItem(machine, machine_schema.EXTRA_SLOT) then
-        local extra_item = get_extra_item()
-        if extra_item then
-            move_from(extra_input_inv, extra_item.slot, machine, machine_schema.EXTRA_SLOT, machine_schema.EXTRA_MIN_STACK)    
-        end
-    end
-
-    -- Process inputSlot
-    local input_item = get_input_item()
-    if input_item then
-        move_from(input_inv, input_item.slot, machine, machine_schema.INPUT_SLOT, machine_schema.INPUT_MIN_STACK)
-    end
-end
-
-
-local function process_machines()
-    for _, machine in pairs(machines) do
-        print_current_machine_info(machine)
-        process_machine(machine)
-        sleep(machine_schema.PROCESS_TIME)
-    end
 end
 
 local function getNonMachineInvs(machine_id)
@@ -216,160 +73,333 @@ local function getNonMachineInvs(machine_id)
     return inventories
 end
 
-function getUserChoiceFromTable(table,match_table)
-    local x,y = term.getCursorPos()
-    local choice = ""
-    if match_table then
-        while not tableContains(table,choice) do
-            term.setCursorPos(x,y)
-            choice = read(nil, table, function(text) return completion.choice(text, table) end)
-        end
-    else
-        while choice == "" do
-            term.setCursorPos(x,y)
-            choice = read(nil, table, function(text) return completion.choice(text, table) end)
-        end
+local function validateInventory(name, allow_nil)
+    local present = (type(name) == "string" and peripheral.isPresent(name))
+    if allow_nil then
+        present = present or type(name) == "nil"
     end
-    parallel_var = choice
-    --return choice
+    return present
 end
 
-function tableContains(table, check_value)
+local function tableContains(table, check_value)
     for _,value in pairs(table) do
-        if value == check_value then 
+        if value == check_value then
             return true
         end
     end
     return false
 end
 
-local function set_inventories(inputInvName, outputInvName, extraInputInvName)
-    expect(1, inputInvName, "string")
-    expect(2, outputInvName, "string")
-    expect(3, extraInputInvName, "string", "nil")
-    output_inv = peripheral.wrap(outputInvName)
-    extra_input_inv = nil
-    if extraInputInvName then
-        extra_input_inv = peripheral.wrap(extraInputInvName)
-    end
-    input_inv = peripheral.wrap(inputInvName)
-end
-
-local function getPeripheralAttach()
-    local machine_id = machine_schema.ID_STR
-    local event = nil
-    local side = machine_id
-    while string.find(side, machine_id) do
-        event, side = os.pullEvent("peripheral")
-    end
-    write(side)
-    table.insert(potentialIO,side)
-    parallel_var = side
-end
-
-local function validateSettings(settingsNameTable)
-    for _,name in pairs(settingsNameTable) do
-
-        if not peripheral.isPresent(name) then
-            reprintLine(18,"Missing Inventories! Please set them up again.")
-            return false
+local function promptChoice(prompt, table, match)
+    write(prompt)
+    local x,y = term.getCursorPos()
+    local choice = ""
+    if match then
+        while not tableContains(table,choice) do
+            term.setCursorPos(x,y)
+            choice = read(nil, table, function(text) return completion.choice(text, table) end)
+            choice = string.lower(choice)
         end
+    else
+        term.setCursorPos(x,y)
+        choice = read(nil, table, function(text) return completion.choice(text, table) end)
+        choice = string.lower(choice)
     end
-    return true
+    return choice
 end
 
-local function setupInventorySettings()
-    local schema_settings_path = machine_schema.ID_STR..".settings"
-    local schema_input_setting = machine_schema.ID_STR..".input"
-    local schema_output_setting = machine_schema.ID_STR..".output"
-    local schema_extra_setting = machine_schema.ID_STR..".extra"
-    local inputInvName = nil
-    local outputInvName = nil
-    local extraInputInvName = nil
-    
-    reprintLine(1,"Press Enter to begin setup...")
-    while true do 
-        local event,key,is_held = os.pullEvent("key")
-        if key == keys.enter then
-            reprintLine(1,"Select or Connect Inventories:")
-            break
-        end
-    end
-    potentialIO = getNonMachineInvs(machine_schema.ID_STR)
-    write("Input:  ")
-    parallel.waitForAny(function() getUserChoiceFromTable(potentialIO,true) end,function() getPeripheralAttach() print("") end)
-    --print(parallel_var)
-    inputInvName = parallel_var
-    write("Output: ")
-    parallel.waitForAny(function() getUserChoiceFromTable(potentialIO,true) end,function() getPeripheralAttach() print("") end)
-    --print(parallel_var)
-    outputInvName = parallel_var
-    write("Extra:  ")
-    parallel.waitForAny(function() getUserChoiceFromTable(potentialIO) end,function() getPeripheralAttach() print("") end)
-    --print(parallel_var)
-    extraInputInvName = parallel_var
-    --print(inputInvName,outputInvName,extraInputInvName)
-    settings.clear()
-    settings.define(schema_input_setting)
-    settings.define(schema_output_setting)
-    settings.define(schema_extra_setting)
-    settings.set(schema_input_setting,inputInvName)
-    settings.set(schema_output_setting,outputInvName)
-    settings.set(schema_extra_setting,extraInputInvName)
-    settings.save(schema_settings_path)
-    settings.load(schema_settings_path)
+
+local Schema = {}
+Schema.__index = Schema
+
+function Schema.new(name, machine_id, peripheral_type)
+    local self = setmetatable({}, Schema)
+    expect(1, name, "string")
+    expect(2, machine_id, "string")
+    expect(3, peripheral_type, "string", "nil")
+    self.schema_name = name
+    self.machine_id = machine_id
+    self.peripheral_type = peripheral_type or "inventory"
+    self.output_slots = nil
+    self.input_slots = nil
+    self.extra_slots = nil
+    return self
 end
 
-local function find_inventories()
-    local schema_settings_path = machine_schema.ID_STR..".settings"
-    local schema_input_setting = machine_schema.ID_STR..".input"
-    local schema_output_setting = machine_schema.ID_STR..".output"
-    local schema_extra_setting = machine_schema.ID_STR..".extra"
-    
-    settings.load(schema_settings_path)
-    local inputInvName = settings.get(schema_input_setting)
-    local outputInvName = settings.get(schema_output_setting)
-    local extraInputInvName = settings.get(schema_extra_setting)
-    -- print(inputInvName,outputInvName)
-    if not inputInvName or not outputInvName then 
-        -- print("deleting schema settings file.")
-        fs.delete(schema_settings_path)
-    end
-    while not (settings.load(schema_settings_path) and validateSettings({inputInvName,outputInvName,extraInputInvName})) do
-        setupInventorySettings()
-        inputInvName = settings.get(schema_input_setting)
-        outputInvName = settings.get(schema_output_setting)
-        extraInputInvName = settings.get(schema_extra_setting)
-    end
-
-    return inputInvName,outputInvName,extraInputInvName
+function Schema:validate()
+    print("Validating Schema...")
+    expect("schema_name", self.schema_name, "string")
+    expect("machine_id", self.machine_id, "string")
+    expect("peripheral_type", self.peripheral_type, "string")
+    print("Valid Machine Schema")
+    sleep(2)
 end
 
-local function startup()
-    check_valid_schema()
-    set_inventories(find_inventories())
-    find_machines()
+function Schema:getDisplayName()
+    return self.machine_id
 end
 
-local function main()
-    term.setCursorPos(1,1)
-    term.clear()
-    startup()
-    print_static_program_info()
-    while true do
-        process_machines()
+function Schema:addSlots(key, slots, filter_func)
+    expect(1, key, "string")
+    expect(2, slots, "number", "table")
+    expect(3, filter_func, "function", "nil")
+    if type(slots) == "number" then
+        range(slots, 1, 1000)
+        slots = {slots}
+    end
+    local verbose_slots = self[key] or {}
+    for k,slot_num in pairs(slots) do
+        local slot = {
+            number = slot_num,
+            filter_func = filter_func or defaultFilter
+        }
+        verbose_slots[slot_num] = slot
+    end
+    self[key] = verbose_slots
+end
+
+function Schema:addOutputSlots(...)
+    self:addSlots("output_slots", ...)
+end
+
+function Schema:addInputSlots(...)
+    self:addSlots("input_slots", ...)
+end
+
+function Schema:addExtraSlots(...)
+    self:addSlots("extra_slots", ...)
+end
+
+-- Printing Slots is mostly for debug purposes
+function Schema:printSlots(key)
+    if self[key] then
+        for k,v in pairs(self[key]) do
+            print(key, k, v.number, v.filter_func)
+        end 
     end
 end
+function Schema:printOutputSlots()
+    self:printSlots("output_slots")
+end
+function Schema:printInputSlots()
+    self:printSlots("input_slots")
+end
 
-local public = {
-    main = main,
-    create_machine_schema = create_machine_schema,
-    create_extra_item_schema = create_extra_item_schema,
-    create_input_item_schema = create_input_item_schema,
-    print_machine_schema = print_machine_schema,
-    print_machines = print_machines,
-    set_inventories = set_inventories,
-    set_process_time = set_process_time
+function Schema:printExtraSlots()
+    self:printSlots("extra_slots")
+end
+
+local Processor = {}
+Processor.DEFAULT_SETTINGS = {
+    output_inv = nil,
+    input_inv = nil,
+    extra_inv = nil
 }
+Processor.__index = Processor
 
-return public
+function Processor:new(name, schema)
+    local self = setmetatable({}, Processor)
+    expect(1, name, "string")
+    expect(2, schema, "table")
+    self.name = name
+    self.schema = schema
+    self.machines = {}
+    self.process_time = 1
+    self.configured = false
+    self.settings = Processor.DEFAULT_SETTINGS
+    self:init()
+    return self
+end
+
+function Processor:getSettingsFilepath()
+    local dir = "machines/settings"
+    local filename = self.schema.machine_id
+    local filepath = string.format("%s/%s", dir, filename)
+    return dir, filename, filepath
+end
+
+function Processor:saveSettings()
+    local dir, filename, filepath = self:getSettingsFilepath()
+    fs.makeDir(dir)
+    local processorSettings = fs.open(filepath, "w")
+    processorSettings.write(textutils.serializeJSON(self.settings))
+    processorSettings.close()
+    self.configured = true
+end
+
+function Processor:loadSettings()
+    local dir, filename, filepath = self:getSettingsFilepath()
+    local processorSettings = fs.open(filepath, "r")
+    if processorSettings then
+        local savedSettings = textutils.unserializeJSON(processorSettings.readAll())
+        processorSettings.close()
+        self.settings = savedSettings
+        self.configured = true
+    end
+end
+
+function Processor:init()
+    self.schema:validate()
+    self:loadSettings() -- load in any saved settings
+    self:setupInventories()
+    self:findMachines()
+end
+
+function Processor:setupInventories()
+    term.clear()
+    term.setCursorPos(1,1)
+    if not self.configured then
+        while not self:validateInventories() do
+            print("Invalid or Missing Inventories")
+            print("Proceeding With Setup...")
+
+            self:setupOutput()
+            self:setupInput()
+            self:setupExtra()
+        end
+        self:saveSettings()
+    end
+
+end
+
+function Processor:validateInventories()
+    local output_valid = validateInventory(self.settings.output_inv)
+    local input_valid = validateInventory(self.settings.input_inv)
+    local extra_valid = validateInventory(self.settings.extra_inv, true)
+    local one_valid = input_valid or output_valid
+    local valid_if_set = extra_valid and one_valid
+    return valid_if_set
+end
+
+function Processor:setProcessTime(process_time)
+    expect(1, process_time, "number")
+    range(process_time, -1, 3600)
+    self.process_time = process_time
+end
+
+function Processor:findMachines()
+    self.machines = { peripheral.find(self.schema.peripheral_type, function(n, p)
+        return string.match(n, self.schema.machine_id)
+    end) }
+end
+
+function Processor:setupInventory(inv_key)
+    local prompt = string.format("Need an '%s' (yes/no): ", inv_key)
+    if promptChoice(prompt, YES_NO_CHOICE, true) == "yes" then
+        prompt = string.format("Select or Connect %s: ", inv_key)
+        local potentialIO = getNonMachineInvs(self.schema.machine_id)
+        local choice = promptChoice(prompt, potentialIO, true)
+        print("")
+        print("Choice:", choice)
+        self.settings[inv_key] = choice
+    end
+end
+
+function Processor:setupOutput()
+    self:setupInventory("output_inv")
+end
+function Processor:setupInput()
+    self:setupInventory("input_inv")
+end
+function Processor:setupExtra()
+    self:setupInventory("extra_inv")
+end
+
+function Processor:setOutputInv(output_inv)
+    self.settings.output_inv = output_inv
+end
+
+function Processor:setInputInv(input_inv)
+    self.settings.input_inv = input_inv
+end
+
+function Processor:setExtraInv(extra_inv)
+    self.settings.extra_inv = extra_inv
+end
+
+function Processor:staticPrint()
+    term.clear()
+    reprintLine(1, "Program Info:")
+    reprintLine(2, "  Name:        ", self.schema.schema_name)
+    reprintLine(3, "  Count:       ", #self.machines)
+    reprintLine(5, "  Input Inv:   ", self.settings.input_inv)
+    reprintLine(6, "  Output Inv:  ", self.settings.output_inv)
+    reprintLine(7, "  Extra Inv:   ", self.settings.extra_inv)
+end
+
+function Processor:printSingleMachine(machine)
+    local mod, name, number = parsePeripheralName(machine)
+    local tend_line = string.format(" Tending To:    %s %s", name, number)
+    reprintLine(9, tend_line)
+end
+
+function Processor:processSlots(machine, inv_key, slots_key)
+    local invName = self.settings[inv_key]
+    local slots = self.schema[slots_key]
+    if invName and slots then
+        for slot_num, slot_info in pairs(slots) do
+            local slotItem, moveCount = getItem(invName, slot_info, machine)
+            if slotItem then
+                move_from(invName, slotItem.slot, machine, slot_num, moveCount)
+            end
+        end
+    end
+end
+
+function Processor:processExtraSlots(machine)
+    -- Only process extra_slots if there is an inventory/slot defined
+    self:processSlots(machine, "extra_inv", "extra_slots")
+end
+function Processor:processInputSlots(machine)
+    -- Only process extra_slots if there is an inventory/slot defined
+    self:processSlots(machine, "input_inv", "input_slots")
+end
+function Processor:processOutputSlots(machine)
+    local invName = self.settings.output_inv
+    local slots = self.schema.output_slots
+    if invName and slots then
+        for slot_num, slot_info in pairs(slots) do
+            if slotHasItem(machine, slot_num) then
+                machine.pushItems(invName,slot_num)
+            end
+        end
+    end
+end
+
+function Processor:processSingleMachine(machine)
+    self:printSingleMachine(machine)
+    self:processInputSlots(machine)
+    self:processExtraSlots(machine)
+    self:processOutputSlots(machine)
+end
+
+function Processor:processMachines()
+    for _, machine in pairs(self.machines) do
+        self:processSingleMachine(machine)
+        sleep(self.process_time)
+    end
+end
+
+
+
+function Processor:run()
+    self:staticPrint()
+    while true do
+        self:processMachines()
+    end
+end
+
+function Processor:printInvs()
+    print("Invs (O,I,E):", self.settings.output_inv, self.settings.input_inv, self.settings.extra_inv)
+end
+
+function Processor:getMachineCount()
+    return #self.machines
+end
+
+
+-- These are the things that can be included (required) by other lua files
+return {
+    Processor = Processor,
+    Schema = Schema
+}

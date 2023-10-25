@@ -1,14 +1,12 @@
-local lootfab = require("machine")
+local mlib = require("machine")
 local function prediction_filter(inv, slot, item)
     return string.match(item.name, ":prediction")
 end
 
-local function loot_main()
-    local output_slots = {2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17}
-    lootfab.create_machine_schema(output_slots, "loot_fabricator")
-    lootfab.create_input_item_schema(1, nil, prediction_filter)
-    lootfab.set_process_time(.75)
-    lootfab.main()
-end
-
-loot_main()
+LootFabSchema = mlib.Schema.new("Loot Fabricators", "loot_fabricator")
+local output_slots = {2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17}
+LootFabSchema:addOutputSlots(output_slots)
+LootFabSchema:addInputSlots(1, prediction_filter)
+local LootFabProcessor = mlib.Processor:new("Loot Fabricators", LootFabSchema)
+LootFabProcessor:setProcessTime(.5) -- Allowing this to run a bit faster than default
+LootFabProcessor:run() -- Kicks off the processing loop
