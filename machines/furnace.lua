@@ -1,16 +1,22 @@
-local machine = require("machine")
-local function test_filter(inv, slot, item)
-    return string.match(item.name, "planks")
+-- Import the Machine class from Machine.lua
+local mlib = require("machine")
+
+-- A few example filter functions for slots.
+-- The inv and the machine will be wrapped
+local function roundRobinInputs(inv, slot, item, machine)
+    local move_count = 8
+    return true, move_count
 end
 
-local function main()
-    machine.create_machine_schema(3, "furnace")
-    machine.create_input_item_schema(1, 1)
-    machine.create_extra_item_schema(2, 1)
-    --machine.create_extra_item_schema(2, 1, test_filter)
-    machine.print_machine_schema()
-    machine.main()
-    machine.print_machines()
+local function roundRobinFuel(inv, slot, item, machine)
+    local move_count = 1
+    return true, move_count
 end
 
-main()
+LootFabSchema = mlib.Schema.new("Furnace Processor", "furnace")
+LootFabSchema:addOutputSlots(3)
+LootFabSchema:addInputSlots(1, roundRobinInputs)
+LootFabSchema:addExtraSlots(2, roundRobinFuel)
+local furnaces = mlib.Processor:new("Furnace Processor", LootFabSchema)
+furnaces:setProcessTime(.5) -- Allowing this to run a bit faster than default
+furnaces:run() -- Kicks off the processing loop
