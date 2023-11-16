@@ -22,14 +22,43 @@ local function trimWhitespace(inputstr)
     return inputstr:match("^%s*(.-)%s*$")
 end
 
+local function helpTextBuilder(command, description, message)
+    local bmessage = message or {}
+    table.insert(bmessage, {
+        {
+            text = "\n" .. command .. "\n",
+            underlined = true,
+            color = "aqua",
+            clickEvent = {
+                action = "suggest_command",
+                value = command
+            },
+            hoverEvent = {
+                action = "show_text",
+                contents = {text = "Click to Run"}
+            }
+        },
+        {
+            text = "   " .. description,
+            color = "white",
+            underlined = false
+        }
+    })
+    return bmessage
+end
+
+
+
 local Command = {}
 Command.__index = Command
 
-function Command.new(command, chat_function)
+function Command.new(command, help, chat_function)
     local self = setmetatable({}, Command)
     expect(1, command, "string")
-    expect(2, chat_function, "function")
+    expect(2, command, "string")
+    expect(3, chat_function, "function")
     self.command = command
+    self.help = help
     self.chat_function = chat_function
     return self
 end
@@ -41,6 +70,10 @@ end
 function Command:executeFunction(...)
     local chatArgs = {...}
     return self.chat_function(table.unpack(chatArgs))
+end
+
+function Command:getHelp()
+    return self.help
 end
 
 
@@ -70,6 +103,9 @@ end
 function Category:getCommand(command)
     return self.commands[command]
 end
+function Category:getCommands()
+    return self.commands
+end
 
 
 local Processor = {}
@@ -98,6 +134,12 @@ function Processor.new(name, prefix, ...)
     return self
 end
 
+function Processor:sendHelpMessage(message, username)
+       
+    local json = textutils.serialiseJSON(message)
+    box.sendFormattedMessage(json, username)
+end
+
 function Processor:processMessage(username, message, uuid, isHidden)
     local trimmed_msg = trimWhitespace(message)
     
@@ -118,8 +160,30 @@ function Processor:processMessage(username, message, uuid, isHidden)
     local found_command = found_category:getCommand(command_components[1])
     if found_command then
         table.remove(command_components, 1)
+        if command_components[1] == "help" then
+            local help_text = found_command:getHelp()
+            local command_txt = string.format("$%s %s %s", self.prefix, found_category:getcategory(), found_command:getCommand())
+            local cmd_help_message = helpTextBuilder(command_txt, help_text)
+            self:sendHelpMessage(cmd_help_message, username)
+            return
+        end
         local cmd_message = table.concat(command_components, " ")
         found_command:executeFunction(username, cmd_message, uuid, isHidden)
+    elseif command_components[1] == "help" then
+        local cat_help_message = {}
+        for command_name,command in pairs(found_category:getCommands()) do
+            local help_text = command:getHelp()
+            local command_txt = string.format("$%s %s %s", self.prefix, found_category:getcategory(), command_name)
+            cat_help_message = helpTextBuilder(command_txt, help_text, cat_help_message)
+        end
+        if found_category:getcategory() == "" then
+            for cat,v in pairs(self.categories) do
+                local help_text = "See Category Help"
+                local command_txt = string.format("$%s %s help", self.prefix, cat)
+                cat_help_message = helpTextBuilder(command_txt, help_text, cat_help_message)
+            end
+        end
+        self:sendHelpMessage(cat_help_message, username)
     end
 end
 
