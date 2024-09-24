@@ -13,7 +13,8 @@ end
 
 while true do
     turtle.turnLeft()
-    if peripheral.hasType("front", "inventory") then
+    -- Make sure the inventory has slots (Growth accelerator started returning as inventory with 0 slots)
+    if peripheral.hasType("front", "inventory") and peripheral.call("front", "size") > 0 then
         for i=1,16 do
             turtle.select(i)
             turtle.drop()
