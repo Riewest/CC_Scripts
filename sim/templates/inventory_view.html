@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Latest Inventory View</title>
+    <style>
+        body { font-family: Arial, sans-serif; padding: 20px; }
+        .inventory { margin-bottom: 40px; }
+        h2 { border-bottom: 2px solid #333; padding-bottom: 5px; }
+        .item {
+            display: inline-block;
+            width: 100px;
+            margin: 10px;
+            text-align: center;
+            vertical-align: top;
+        }
+        .item img {
+            width: 64px;
+            height: 64px;
+            image-rendering: pixelated;
+        }
+        .item-name {
+            font-size: 0.8em;
+            margin-top: 5px;
+            word-wrap: break-word;
+        }
+        .item-count {
+            font-weight: bold;
+            color: #555;
+        }
+    </style>
+</head>
+<body>
+    <h1>Latest Inventory View</h1>
+    {% for inv in inventories %}
+    <div class="inventory">
+        <h2>Peripheral: {{ inv.peripheral }}</h2>
+        {% if inv.items %}
+            {% for item in inv["items"] %}
+            <div class="item">
+                {% if "minecraft:" in item.name %}
+                <img src="https://static.minecraftitemids.com/64/{{ item.name.split(':', 1)[1] }}.png" alt="{{ item.name }}">
+                {% else %}
+                <img src="/static/Missing_Texture_JE4.webp" alt="Missing Texture">
+                {% endif %}
+                <div class="item-name" title="{{ item.name }}">{{ item.displayName or item.name }}</div>
+                <div class="item-count">x{{ item.count }}</div>
+            </div>
+            {% endfor %}
+        {% else %}
+            <p><em>No items</em></p>
+        {% endif %}
+    </div>
+    {% endfor %}
+</body>
+</html>

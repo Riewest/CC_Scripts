@@ -1,0 +1,237 @@
+[
+  {
+    "peripheral": "minecraft:chest_3",
+    "items": [
+      {
+        "slot": 1,
+        "name": "minecraft:prismarine",
+        "itemGroups": [
+          {
+            "id": "minecraft:building_blocks",
+            "displayName": "Building Blocks"
+          },
+          {
+            "id": "minecraft:natural_blocks",
+            "displayName": "Natural Blocks"
+          }
+        ],
+        "tags": {},
+        "count": 64,
+        "maxCount": 64,
+        "displayName": "Prismarine"
+      },
+      {
+        "maxDamage": 1561,
+        "maxCount": 1,
+        "displayName": "Diamond Sword",
+        "count": 1,
+        "itemGroups": [
+          {
+            "id": "minecraft:combat",
+            "displayName": "Combat"
+          }
+        ],
+        "slot": 2,
+        "tags": {
+          "c:tools": true,
+          "minecraft:enchantable/durability": true,
+          "minecraft:enchantable/vanishing": true,
+          "minecraft:enchantable/sharp_weapon": true,
+          "minecraft:enchantable/weapon": true,
+          "minecraft:enchantable/fire_aspect": true,
+          "c:enchantables": true,
+          "c:tools/melee_weapon": true,
+          "minecraft:breaks_decorated_pots": true,
+          "minecraft:swords": true,
+          "minecraft:enchantable/sword": true
+        },
+        "name": "minecraft:diamond_sword",
+        "damage": 0
+      },
+      {
+        "slot": 3,
+        "name": "minecraft:redstone",
+        "itemGroups": [
+          {
+            "id": "minecraft:redstone_blocks",
+            "displayName": "Redstone Blocks"
+          },
+          {
+            "id": "minecraft:ingredients",
+            "displayName": "Ingredients"
+          }
+        ],
+        "tags": {
+          "c:dusts": true,
+          "minecraft:trim_materials": true,
+          "c:dusts/redstone": true
+        },
+        "count": 1,
+        "maxCount": 64,
+        "displayName": "Redstone Dust"
+      }
+    ]
+  },
+  {
+    "peripheral": "minecraft:chest_1",
+    "items": [
+      {
+        "slot": 1,
+        "name": "minecraft:copper_block",
+        "itemGroups": [
+          {
+            "id": "minecraft:building_blocks",
+            "displayName": "Building Blocks"
+          }
+        ],
+        "tags": {
+          "c:storage_blocks/copper": true,
+          "c:storage_blocks": true
+        },
+        "count": 64,
+        "maxCount": 64,
+        "displayName": "Block of Copper"
+      },
+      {
+        "slot": 2,
+        "name": "minecraft:birch_planks",
+        "itemGroups": [
+          {
+            "id": "minecraft:building_blocks",
+            "displayName": "Building Blocks"
+          }
+        ],
+        "tags": {
+          "minecraft:planks": true
+        },
+        "count": 1,
+        "maxCount": 64,
+        "displayName": "Birch Planks"
+      }
+    ]
+  },
+  {
+    "peripheral": "minecraft:chest_2",
+    "items": [
+      {
+        "slot": 1,
+        "name": "minecraft:quartz_bricks",
+        "itemGroups": [
+          {
+            "id": "minecraft:building_blocks",
+            "displayName": "Building Blocks"
+          }
+        ],
+        "tags": {},
+        "count": 64,
+        "maxCount": 64,
+        "displayName": "Quartz Bricks"
+      },
+      {
+        "slot": 2,
+        "name": "minecraft:tuff",
+        "itemGroups": [
+          {
+            "id": "minecraft:building_blocks",
+            "displayName": "Building Blocks"
+          },
+          {
+            "id": "minecraft:natural_blocks",
+            "displayName": "Natural Blocks"
+          }
+        ],
+        "tags": {
+          "c:stones": true
+        },
+        "count": 64,
+        "maxCount": 64,
+        "displayName": "Tuff"
+      }
+    ]
+  },
+  {
+    "peripheral": "minecraft:chest_0",
+    "items": [
+      {
+        "slot": 1,
+        "name": "minecraft:oak_log",
+        "itemGroups": [
+          {
+            "id": "minecraft:building_blocks",
+            "displayName": "Building Blocks"
+          },
+          {
+            "id": "minecraft:natural_blocks",
+            "displayName": "Natural Blocks"
+          }
+        ],
+        "tags": {
+          "minecraft:oak_logs": true,
+          "minecraft:logs_that_burn": true,
+          "minecraft:completes_find_tree_tutorial": true,
+          "minecraft:logs": true
+        },
+        "count": 64,
+        "maxCount": 64,
+        "displayName": "Oak Log"
+      },
+      {
+        "slot": 2,
+        "name": "minecraft:chest",
+        "itemGroups": [
+          {
+            "id": "minecraft:functional_blocks",
+            "displayName": "Functional Blocks"
+          },
+          {
+            "id": "minecraft:redstone_blocks",
+            "displayName": "Redstone Blocks"
+          }
+        ],
+        "tags": {
+          "c:chests": true,
+          "c:chests/wooden": true
+        },
+        "count": 1,
+        "maxCount": 64,
+        "displayName": "Chest"
+      },
+      {
+        "slot": 3,
+        "name": "minecraft:stripped_spruce_wood",
+        "itemGroups": [
+          {
+            "id": "minecraft:building_blocks",
+            "displayName": "Building Blocks"
+          }
+        ],
+        "tags": {
+          "minecraft:spruce_logs": true,
+          "minecraft:completes_find_tree_tutorial": true,
+          "minecraft:logs_that_burn": true,
+          "c:stripped_woods": true,
+          "minecraft:logs": true
+        },
+        "count": 1,
+        "maxCount": 64,
+        "displayName": "Stripped Spruce Wood"
+      },
+      {
+        "slot": 4,
+        "name": "computercraft:wired_modem_full",
+        "itemGroups": [
+          {
+            "id": "computercraft:tab",
+            "displayName": "ComputerCraft"
+          }
+        ],
+        "tags": {
+          "computercraft:wired_modem": true
+        },
+        "count": 1,
+        "maxCount": 64,
+        "displayName": "Wired Modem"
+      }
+    ]
+  }
+]
