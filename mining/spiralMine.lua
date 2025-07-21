@@ -17,7 +17,10 @@ local dropTags = {
 }
 -- Drop items with these exact names
 local dropItems = {
-    "minecraft:clay_ball"
+    "minecraft:clay_ball",
+    "minecraft:flint",
+    "minecraft:torch",
+    "minecraft:gravel"
 }
 
 local function returnItems()
