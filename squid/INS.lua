@@ -26,7 +26,9 @@ AxisLookup.DOWN = "y"
 local GPS_DIR = "/GPS"
 local INS_FILE = "INS.json"
 local INS_FILEPATH = string.format("%s/%s", GPS_DIR, INS_FILE)
-
+local PING_DIR = "/PINGS"
+local PING_RATE = 5
+local PING_PROTOCOL = "squidping"
 
 -- Static function that gets called by the constructor to make sure things are setup
 local function initINS()
@@ -34,7 +36,7 @@ local function initINS()
 end
 
 local function tableContains(table, check_value)
-    for _,value in pairs(table) do
+    for _, value in pairs(table) do
         if value == check_value then
             return true
         end
@@ -43,37 +45,41 @@ local function tableContains(table, check_value)
 end
 
 local function get_keys(t)
-    local keys={}
-    for key,_ in pairs(t) do
-      table.insert(keys, key)
+    local keys = {}
+    for key, _ in pairs(t) do
+        table.insert(keys, key)
     end
     return keys
-  end
+end
 
 local function promptChoice(prompt, table, match)
-    local x,y = term.getCursorPos()
+    local x, y = term.getCursorPos()
     local choice = nil
     if match then
-        while not tableContains(table,choice) do
-            term.setCursorPos(x,y)
+        while not tableContains(table, choice) do
+            term.setCursorPos(x, y)
             term.clearLine()
             write(prompt)
-            choice = read(nil, table, function(text) return completion.choice(text, table) end)
+            choice = read(nil, table, function(text)
+                return completion.choice(text, table)
+            end)
         end
     else
-        term.setCursorPos(x,y)
+        term.setCursorPos(x, y)
         term.clearLine()
         write(prompt)
-        choice = read(nil, table, function(text) return completion.choice(text, table) end)
+        choice = read(nil, table, function(text)
+            return completion.choice(text, table)
+        end)
     end
     return choice
 end
 
 local function promptInteger(prompt)
-    local x,y = term.getCursorPos()
+    local x, y = term.getCursorPos()
     local input_int = nil
     while not input_int do
-        term.setCursorPos(x,y)
+        term.setCursorPos(x, y)
         term.clearLine()
         write(prompt)
         local input_str = read()
@@ -84,7 +90,7 @@ end
 
 local function promptLoad()
     term.clear()
-    term.setCursorPos(1,1)
+    term.setCursorPos(1, 1)
     print("What Direction Am I Facing?")
     print("NORTH, EAST, SOUTH, WEST")
     local str_direction = promptChoice("Facing: ", get_keys(Directions), true)
@@ -93,7 +99,7 @@ local function promptLoad()
     local y = promptInteger("Y: ")
     local z = promptInteger("Z: ")
     local ins_load = {}
-    ins_load.current_coord = vector.new(x,y,z)
+    ins_load.current_coord = vector.new(x, y, z)
     ins_load.direction = Directions[str_direction]
     return ins_load
 end
@@ -123,24 +129,26 @@ local function gpsLoad()
     end
 
     local first_coord = vector.new(gps.locate(GPS_TIMEOUT))
-    if not first_coord then return false end
-	fmove()
-	local second_coord = vector.new(gps.locate(GPS_TIMEOUT))
+    if not first_coord then
+        return false
+    end
+    fmove()
+    local second_coord = vector.new(gps.locate(GPS_TIMEOUT))
 
-	local result = first_coord:sub(second_coord)
-	local x = result.x
-	local z = result.z
-	local new_direction = nil
-	if x > 0 then
-		new_direction = Directions.WEST
-	elseif x < 0 then
-		new_direction = Directions.EAST
-	end
-	if z > 0 then
-		new_direction = Directions.NORTH
-	elseif z < 0 then
-		new_direction = Directions.SOUTH
-	end
+    local result = first_coord:sub(second_coord)
+    local x = result.x
+    local z = result.z
+    local new_direction = nil
+    if x > 0 then
+        new_direction = Directions.WEST
+    elseif x < 0 then
+        new_direction = Directions.EAST
+    end
+    if z > 0 then
+        new_direction = Directions.NORTH
+    elseif z < 0 then
+        new_direction = Directions.SOUTH
+    end
     turtle.turnRight()
     turtle.turnRight()
     fmove()
@@ -154,19 +162,19 @@ end
 
 local function loadINS()
     term.clear()
-    term.setCursorPos(1,1)
+    term.setCursorPos(1, 1)
     print("Loading INS...")
 
     -- Primary key/values wiil overwrite secondary if the same key exists
     local function mergeTables(primary, secondary)
-        for k,v in pairs(primary) do
+        for k, v in pairs(primary) do
             secondary[k] = v
         end
         return secondary
     end
 
-    local loaded_ins = fileLoad() --This can return an empty table if no ins file exists
-    
+    local loaded_ins = fileLoad() -- This can return an empty table if no ins file exists
+
     loaded_ins.gps_available = (gps.locate(GPS_TIMEOUT) ~= nil and true or false) -- Initial Check For GPS
     if loaded_ins.gps_available then
         local gps_ins = gpsLoad()
@@ -182,13 +190,13 @@ local function loadINS()
                 return
             end
         end
-    end 
+    end
 
     local function continue()
-        local x,y = term.getCursorPos()
+        local x, y = term.getCursorPos()
         local timer = 10
-        for i=timer, 1, -1 do
-            term.setCursorPos(x,y)
+        for i = timer, 1, -1 do
+            term.setCursorPos(x, y)
             term.clearLine()
             print("Continuing in " .. tostring(i))
             sleep(1)
@@ -212,7 +220,8 @@ local function loadINS()
     end
 
     if not loaded_ins.home_coord or not loaded_ins.home_direction then
-        loaded_ins.home_coord = vector.new(loaded_ins.current_coord.x, loaded_ins.current_coord.y, loaded_ins.current_coord.z)
+        loaded_ins.home_coord = vector.new(loaded_ins.current_coord.x, loaded_ins.current_coord.y,
+            loaded_ins.current_coord.z)
         loaded_ins.home_direction = loaded_ins.direction
     end
 
@@ -222,7 +231,6 @@ end
 local function reverseDirection(d)
     return (d + 2 % 4)
 end
-
 
 -- Define class
 local INS = {
@@ -243,7 +251,6 @@ function INS:new(force_move)
     return obj
 end
 
-
 function INS:save()
     local save_data = {}
     save_data.current_coord = self.current_coord
@@ -257,7 +264,7 @@ function INS:save()
 end
 
 -- function INS:load()
-    
+
 -- end
 
 function INS:gpsFix()
@@ -270,33 +277,34 @@ end
 
 function INS:gpsFixFace()
     local first_coord = vector.new(gps.locate(GPS_TIMEOUT))
-    if not first_coord then return false end
-	self:forward()
-	local second_coord = vector.new(gps.locate(GPS_TIMEOUT))
+    if not first_coord then
+        return false
+    end
+    self:forward()
+    local second_coord = vector.new(gps.locate(GPS_TIMEOUT))
 
-	local result = first_coord:sub(second_coord)
-	local x = result.x
-	local z = result.z
-	local new_direction = nil
-	if x > 0 then
-		new_direction = Directions.WEST
-	elseif x < 0 then
-		new_direction = Directions.EAST
-	end
-	if z > 0 then
-		new_direction = Directions.NORTH
-	elseif z < 0 then
-		new_direction = Directions.SOUTH
-	end
-	if new_direction then
-		self.direction = new_direction
+    local result = first_coord:sub(second_coord)
+    local x = result.x
+    local z = result.z
+    local new_direction = nil
+    if x > 0 then
+        new_direction = Directions.WEST
+    elseif x < 0 then
+        new_direction = Directions.EAST
+    end
+    if z > 0 then
+        new_direction = Directions.NORTH
+    elseif z < 0 then
+        new_direction = Directions.SOUTH
+    end
+    if new_direction then
+        self.direction = new_direction
         self:save()
-	end
+    end
     self:turnRight(2)
     self:forward()
     self:turnRight(2)
 end
-
 
 function INS:move(moveFunc, digFunc, coordKey, coordChange, distance, action)
     distance = distance or 1
@@ -338,7 +346,6 @@ function INS:forward(distance, action)
     end
     self:move(turtle.forward, turtle.dig, coordKey, coordVal, distance, action)
 end
-
 
 function INS:turn(turnFunc, turnVal, amount, action)
     amount = amount or 1
@@ -384,7 +391,7 @@ function INS:goTo(coord, direction, action)
     elseif travel.x < 0 then
         self:turnDir(Directions.WEST)
     end
-    self:forward(math.abs(travel.x),action)
+    self:forward(math.abs(travel.x), action)
 
     -- Travel Z change Second
     if travel.z > 0 then
@@ -392,8 +399,8 @@ function INS:goTo(coord, direction, action)
     elseif travel.z < 0 then
         self:turnDir(Directions.NORTH)
     end
-    self:forward(math.abs(travel.z),action)
-    
+    self:forward(math.abs(travel.z), action)
+
     -- Travel Y change Third
     if travel.y > 0 then
         self:up(travel.y)
@@ -432,8 +439,9 @@ function INS:clean()
     end
 end
 
-function INS:getDisplayCoord()
-    return string.format("%s, %s, %s", self.current_coord.x, self.current_coord.y, self.current_coord.z)
+function INS:getDisplayCoord(coord)
+    coord = coord or self.current_coord
+    return string.format("%s, %s, %s", coord.x, coord.y, coord.z)
 end
 
 function INS:getDisplayDir(dir)
@@ -450,10 +458,60 @@ function INS:printLoc()
     print(self:getDisplayCoord(), self:getDisplayDir())
 end
 
+function INS:pingLoc()
+    while true do
+        -- === Find and Open Modem ===
+        local modem = {peripheral.find("modem", rednet.open)}
+        if not modem then
+            return
+        end
+
+        local coord = vector.new(gps.locate(GPS_TIMEOUT))
+        
+        local display_coord = self:getDisplayCoord(coord)
+        -- === Configuration ===
+        local message = string.format("%s: (%s) F: %s",
+            os.computerLabel() or os.computerID(), 
+            display_coord,
+            turtle.getFuelLevel())
+
+        -- === Broadcast Ping ===
+        rednet.broadcast(message, PING_PROTOCOL)
+        sleep(PING_RATE)
+    end
+end
+
+local function pingServer()
+    -- === Configuration ===
+    -- === Find and Open Modem ===
+    local modem = {peripheral.find("modem", rednet.open)}
+    if not modem then
+        print("No modem found. Cannot listen for pings.")
+        return
+    end
+    fs.makeDir(PING_DIR)
+
+    print("Listening for pings on protocol:", PING_PROTOCOL)
+
+    while true do
+        local senderId, msg = rednet.receive(PING_PROTOCOL)
+        local timestamp = os.epoch("utc") / 1000
+        local formattedTime = os.date("%H:%M:%S", timestamp) -- real-world time
+        local formatted_message = ("[%s] (%d) %s"):format(formattedTime, senderId, tostring(msg))
+        print(formatted_message)
+
+        local ping_filepath = string.format("%s/%s.ping", PING_DIR, senderId)
+        local save_file = fs.open(ping_filepath, "w")
+        save_file.write(formatted_message)
+        save_file.close()
+    end
+end
 
 -- Example usage:
-local function runExample()
-    
+local function runExample(nav)
+
+    -- Pass in a new nav object
+
     -- Add two lines to the top of the file to include this
     -- package.path = package.path .. ";/?;/?.lua;/?/init.lua;/squid/?;/squid/?.lua;/squid/?/init.lua"
     -- local INS = require("INS") 
@@ -461,7 +519,7 @@ local function runExample()
     -- First thing any program using INS should do is make an INS object
     -- This will load the coords from file, gps, or prompt
     -- If this is a first load then the home_coord/direction will default to current location
-    local nav = INS:new()
+    nav = nav or INS:new()
     nav:printLoc()
 
     -- If INS was loaded from file (or gps & file) then this will be considered the "first run" of any program
@@ -474,6 +532,10 @@ local function runExample()
     -- There are normal turtle.MOVEFUNC options available but you can pass in optional amounts and action func per move
     nav:forward(5)
     nav:up(2)
+    nav:turnRight()
+    nav:forward(20)
+    nav:turnLeft()
+    nav:forward(10)
 
     -- you can travel to a specific coordinate
     -- local test_coord = vector.new(-215, 69, -100)
@@ -488,11 +550,11 @@ local function runExample()
     nav:clean()
 end
 
-
 return {
     INS = INS,
     Directions = Directions,
     reverseDirection = reverseDirection,
-    runExample = runExample
+    runExample = runExample,
+    pingServer = pingServer
 }
 
