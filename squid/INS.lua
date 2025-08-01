@@ -119,12 +119,12 @@ end
 
 local function gpsLoad()
     local success = false
+    local function fmove()
+        turtle.dig()
+        return turtle.forward()
+    end
     while not success do
         local needUp = true
-        local function fmove()
-            turtle.dig()
-            return turtle.forward()
-        end
         local first_coord = vector.new(gps.locate(GPS_TIMEOUT))
         if not first_coord then return false end
         for try = 1,4 do
