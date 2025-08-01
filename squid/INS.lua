@@ -356,15 +356,11 @@ function INS:move(moveFunc, digFunc, coordKey, coordChange, distance, action)
                 digFunc()
             end
         end
-        if not success then
-            -- print("Failed to move after 10 attempts.")
-            return false
-        end
-        if action then
+        if action and success then
             action()
         end
     end
-    return true
+    return success
 end
 
 -- Method to move up
