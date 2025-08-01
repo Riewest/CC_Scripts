@@ -325,23 +325,6 @@ function INS:gpsFixFace()
     end
 end
 
-
--- function INS:move(moveFunc, digFunc, coordKey, coordChange, distance, action)
---     distance = distance or 1
---     for m = 1, distance do
---         while not moveFunc() do
---             if self.force_move then
---                 digFunc()
---             end
---         end
---         self.current_coord[coordKey] = self.current_coord[coordKey] + coordChange
---         self:save()
---         if action then
---             action()
---         end
---     end
--- end
-
 function INS:move(moveFunc, digFunc, coordKey, coordChange, distance, action)
     distance = distance or 1
     for m = 1, distance do
