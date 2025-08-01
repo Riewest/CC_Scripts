@@ -458,8 +458,7 @@ end
 
 local function main()
     local start_time = os.clock()
-    -- Initialize objects
-    startup()
+    
     -- Do the work
     minePokeHoles()
     -- End Back at the start
@@ -471,7 +470,15 @@ local function main()
     print("Duration:",duration)
 end
 
-main()
+
+-- Initialize objects
+startup()
+parallel.waitForAny(
+    main, 
+    function ()
+        nav:pingLoc()
+    end
+)
 
 
 

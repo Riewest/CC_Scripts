@@ -30,7 +30,7 @@ local INS_FILE = "INS.json"
 local INS_FILEPATH = string.format("%s/%s", GPS_DIR, INS_FILE)
 local PING_DIR = "/PINGS"
 local PING_RATE = 5
-local PING_PROTOCOL = "squidping"
+local PING_PROTOCOL = "INS_PING"
 
 -- Static function that gets called by the constructor to make sure things are setup
 local function initINS()
