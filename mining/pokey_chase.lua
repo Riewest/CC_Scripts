@@ -392,7 +392,7 @@ local function scanLayer()
 end
 
 local function bedrockPlunger()
-    nav:down(5,scanLayer())
+    nav:down(5,scanLayer)
     while nav.current_coord.y ~= HOLE_BOTTOM do
         nav:up()
     end
