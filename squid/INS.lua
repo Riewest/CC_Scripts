@@ -371,7 +371,7 @@ function INS:turnDir(direction)
     end
 end
 
-function INS:goTo(coord, direction)
+function INS:goTo(coord, direction, action)
     if not coord then
         return false -- Return false if no coord given
     end
@@ -384,7 +384,7 @@ function INS:goTo(coord, direction)
     elseif travel.x < 0 then
         self:turnDir(Directions.WEST)
     end
-    self:forward(math.abs(travel.x))
+    self:forward(math.abs(travel.x),action)
 
     -- Travel Z change Second
     if travel.z > 0 then
@@ -392,7 +392,7 @@ function INS:goTo(coord, direction)
     elseif travel.z < 0 then
         self:turnDir(Directions.NORTH)
     end
-    self:forward(math.abs(travel.z))
+    self:forward(math.abs(travel.z),action)
     
     -- Travel Y change Third
     if travel.y > 0 then
