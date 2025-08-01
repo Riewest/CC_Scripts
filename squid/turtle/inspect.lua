@@ -14,5 +14,7 @@ end
 
 file.close()
 
-print("Inspection written to info.lua")
+shell.run("edit info.lua")
+
+fs.delete("info.lua")
 
