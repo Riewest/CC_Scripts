@@ -392,15 +392,9 @@ local function scanLayer()
 end
 
 local function bedrockPlunger()
-    -- print("BRPlunger")
-    for brLayer = 0,5 do
-        if not nav:down(1) then
-            scanLayer()
-            while nav.current_coord.y ~= HOLE_BOTTOM do
-                nav:up(1, scanLayer)
-            end
-            break
-        end
+    nav:down(5,scanLayer())
+    while nav.current_coord.y ~= HOLE_BOTTOM do
+        nav:up()
     end
 end
 
