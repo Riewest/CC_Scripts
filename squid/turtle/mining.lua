@@ -5,6 +5,8 @@ local TAG_BLACKLIST = {
     "minecraft:dirt",
     "c:gravels",
     "c:cobblestones",
+    "c:chests",
+    "minecraft:features_cannot_replace",
     "computercraft:turtle"
 }
 
