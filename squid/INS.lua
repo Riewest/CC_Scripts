@@ -348,6 +348,8 @@ function INS:move(moveFunc, digFunc, coordKey, coordChange, distance, action)
         local success = false
         for attempt = 1, 10 do
             if moveFunc() then
+                self.current_coord[coordKey] = self.current_coord[coordKey] + coordChange
+                self:save()
                 success = true
                 break
             elseif self.force_move and digFunc then
@@ -358,8 +360,6 @@ function INS:move(moveFunc, digFunc, coordKey, coordChange, distance, action)
             -- print("Failed to move after 10 attempts.")
             return false
         end
-        self.current_coord[coordKey] = self.current_coord[coordKey] + coordChange
-        self:save()
         if action then
             action()
         end
