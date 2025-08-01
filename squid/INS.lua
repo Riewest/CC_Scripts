@@ -23,6 +23,8 @@ AxisLookup.WEST = "x"
 AxisLookup.UP = "y"
 AxisLookup.DOWN = "y"
 
+local BEDROCK_LEVEL = -60
+
 local GPS_DIR = "/GPS"
 local INS_FILE = "INS.json"
 local INS_FILEPATH = string.format("%s/%s", GPS_DIR, INS_FILE)
@@ -116,40 +118,54 @@ local function fileLoad()
 end
 
 local function gpsLoad()
+    local success = false
     local function fmove()
-        while not turtle.forward() do
-            turtle.dig()
+        turtle.dig()
+        return turtle.forward()
+    end
+    while not success do
+        local needUp = true
+        local first_coord = vector.new(gps.locate(GPS_TIMEOUT))
+        if not first_coord then return false end
+        for try = 1,4 do
+            if fmove() then
+                needUp = false
+                break
+            else
+                turtle.turnRight()
+            end
+        end
+        if not needUp then
+            local second_coord = vector.new(gps.locate(GPS_TIMEOUT))
+
+            local result = first_coord:sub(second_coord)
+            local x = result.x
+            local z = result.z
+            local new_direction = nil
+            if x > 0 then
+                new_direction = Directions.WEST
+            elseif x < 0 then
+                new_direction = Directions.EAST
+            end
+            if z > 0 then
+                new_direction = Directions.NORTH
+            elseif z < 0 then
+                new_direction = Directions.SOUTH
+            end
+            turtle.turnRight()
+            turtle.turnRight()
+            fmove()
+            turtle.turnRight()
+            turtle.turnRight()
+            return {
+                current_coord = first_coord,
+                direction = new_direction
+            }
+        else
+            turtle.digUp()
+            turtle.up()
         end
     end
-
-    local first_coord = vector.new(gps.locate(GPS_TIMEOUT))
-    if not first_coord then return false end
-	fmove()
-	local second_coord = vector.new(gps.locate(GPS_TIMEOUT))
-
-	local result = first_coord:sub(second_coord)
-	local x = result.x
-	local z = result.z
-	local new_direction = nil
-	if x > 0 then
-		new_direction = Directions.WEST
-	elseif x < 0 then
-		new_direction = Directions.EAST
-	end
-	if z > 0 then
-		new_direction = Directions.NORTH
-	elseif z < 0 then
-		new_direction = Directions.SOUTH
-	end
-    turtle.turnRight()
-    turtle.turnRight()
-    fmove()
-    turtle.turnRight()
-    turtle.turnRight()
-    return {
-        current_coord = first_coord,
-        direction = new_direction
-    }
 end
 
 local function loadINS()
@@ -256,10 +272,6 @@ function INS:save()
     ins_json.close()
 end
 
--- function INS:load()
-    
--- end
-
 function INS:gpsFix()
     local x, y, z = gps.locate(GPS_TIMEOUT)
     if x and y and z then
@@ -269,59 +281,79 @@ function INS:gpsFix()
 end
 
 function INS:gpsFixFace()
-    local first_coord = vector.new(gps.locate(GPS_TIMEOUT))
-    if not first_coord then return false end
-	self:forward()
-	local second_coord = vector.new(gps.locate(GPS_TIMEOUT))
-
-	local result = first_coord:sub(second_coord)
-	local x = result.x
-	local z = result.z
-	local new_direction = nil
-	if x > 0 then
-		new_direction = Directions.WEST
-	elseif x < 0 then
-		new_direction = Directions.EAST
-	end
-	if z > 0 then
-		new_direction = Directions.NORTH
-	elseif z < 0 then
-		new_direction = Directions.SOUTH
-	end
-	if new_direction then
-		self.direction = new_direction
-        self:save()
-	end
-    self:turnRight(2)
-    self:forward()
-    self:turnRight(2)
-end
-
-
-function INS:move(moveFunc, digFunc, coordKey, coordChange, distance, action)
-    distance = distance or 1
-    for m = 1, distance do
-        while not moveFunc() do
-            if self.force_move then
-                digFunc()
+    -- print("Getting facing direction...")
+    local success = false
+    while not success do
+        local needUp = true
+        local first_coord = vector.new(gps.locate(GPS_TIMEOUT))
+        if not first_coord then return false end
+        for try = 1,4 do
+            if self:forward() then
+                needUp = false
+                break
+            else
+                self:turnRight()
             end
         end
-        self.current_coord[coordKey] = self.current_coord[coordKey] + coordChange
-        self:save()
-        if action then
-            action()
+        if not needUp then
+            local second_coord = vector.new(gps.locate(GPS_TIMEOUT))
+        
+            local result = first_coord:sub(second_coord)
+            local x = result.x
+            local z = result.z
+            local new_direction = nil
+            if x > 0 then
+                new_direction = Directions.WEST
+            elseif x < 0 then
+                new_direction = Directions.EAST
+            end
+            if z > 0 then
+                new_direction = Directions.NORTH
+            elseif z < 0 then
+                new_direction = Directions.SOUTH
+            end
+            if new_direction then
+                self.direction = new_direction
+                self:save()
+            end
+            self:turnRight(2)
+            self:forward()
+            self:turnRight(2)
+        else
+            self:up()
         end
     end
 end
 
+function INS:move(moveFunc, digFunc, coordKey, coordChange, distance, action)
+    distance = distance or 1
+    for m = 1, distance do
+        local success = false
+        for attempt = 1, 10 do
+            if moveFunc() then
+                self.current_coord[coordKey] = self.current_coord[coordKey] + coordChange
+                self:save()
+                success = true
+                break
+            elseif self.force_move and digFunc then
+                digFunc()
+            end
+        end
+        if action and success then
+            action()
+        end
+    end
+    return success
+end
+
 -- Method to move up
 function INS:up(distance, action)
-    self:move(turtle.up, turtle.digUp, "y", 1, distance, action)
+    return self:move(turtle.up, turtle.digUp, "y", 1, distance, action)
 end
 
 -- Method to move down
 function INS:down(distance, action)
-    self:move(turtle.down, turtle.digDown, "y", -1, distance, action)
+    return self:move(turtle.down, turtle.digDown, "y", -1, distance, action)
 end
 
 -- Method to move forward
@@ -336,7 +368,7 @@ function INS:forward(distance, action)
     elseif self.direction == Directions.SOUTH then
         coordKey, coordVal = "z", 1
     end
-    self:move(turtle.forward, turtle.dig, coordKey, coordVal, distance, action)
+    return self:move(turtle.forward, turtle.dig, coordKey, coordVal, distance, action)
 end
 
 
@@ -374,6 +406,10 @@ end
 function INS:goTo(coord, direction, action)
     if not coord then
         return false -- Return false if no coord given
+    end
+
+    while self.current_coord.y <= BEDROCK_LEVEL do
+        self:up()
     end
 
     local travel = coord:sub(self.current_coord)
@@ -476,7 +512,7 @@ local function runExample()
     nav:up(2)
 
     -- you can travel to a specific coordinate
-    -- local test_coord = vector.new(-215, 69, -100)
+    -- local test_coord = vector.new(-75, -51, 40)
     -- nav:goTo(test_coord, Directions.WEST)
 
     -- You can go back to the home coord/direction
