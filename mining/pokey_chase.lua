@@ -24,7 +24,8 @@ end
 --- Imports and Globals
 ---------------------------------
 
-package.path = package.path .. ";/?;/?.lua;/?/init.lua;/squid/?;/squid/?.lua;/squid/?/init.lua"
+package.path = package.path .. ";/?;/?.lua;/?/init.lua;/squid/?;/squid/?.lua;/squid/turtle/?.lua;/squid/?/init.lua"
+
 local INS = require("INS")
 local MINING = require("mining")
 
@@ -393,8 +394,11 @@ end
 local function doPokehole()
     scanLayer()
     if nav.current_coord.y == HOLE_BOTTOM then
+        MINING.scanDig("Down")
         nav:up(hole_height, scanLayer)
+        MINING.scanDig("Up")
     else
+        MINING.scanDig("Up")
         nav:down(hole_height, scanLayer)
         MINING.scanDig("Down")
     end
@@ -415,7 +419,15 @@ local function minePokeHoles()
         travelTo.y = (math.abs(nav.current_coord.y - nav.home_coord.y) < math.abs(nav.current_coord.y - HOLE_BOTTOM)) and nav.home_coord.y or HOLE_BOTTOM
 
         -- Travel to the top or bottom of next pokehole
-        nav:goTo(travelTo)
+        if nav.current_coord.y == HOLE_BOTTOM then
+            nav:goTo(travelTo,nil,function ()
+                MINING.scanDig("Down")
+            end)
+        else
+            nav:goTo(travelTo,nil,function ()
+                MINING.scanDig("Up")
+            end)
+        end
 
         doPokehole()
         pokehole_map:nextHole()
