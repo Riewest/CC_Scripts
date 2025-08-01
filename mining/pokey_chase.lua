@@ -40,7 +40,7 @@ local returnAndEmpty
 local ROOT_COORD = vector.new(0,0,0)
 local DISTANCE_BETWEEN = 4 --Empty blocks between holes
 local DIST_MOD = DISTANCE_BETWEEN + 1
-local HOLE_BOTTOM = -59 -- Shoule be bedrock safe
+local HOLE_BOTTOM = -59 -- Should be bedrock safe
 local MIN_HOLE_FUEL = 8
 
 -- Used in the map generation to make sure we always do the correct square in front of the turtle
@@ -391,16 +391,29 @@ local function scanLayer()
     nav:turnRight(4, scan)
 end
 
+local function bedrockPlunger()
+    -- print("BRPlunger")
+    for brLayer = 0,5 do
+        if not nav:down(1) then
+            scanLayer()
+            while nav.current_coord.y ~= HOLE_BOTTOM do
+                nav:up(1, scanLayer)
+            end
+            break
+        end
+    end
+end
+
 local function doPokehole()
     scanLayer()
     if nav.current_coord.y == HOLE_BOTTOM then
-        MINING.scanDig("Down")
+        bedrockPlunger()
         nav:up(hole_height, scanLayer)
         MINING.scanDig("Up")
     else
         MINING.scanDig("Up")
         nav:down(hole_height, scanLayer)
-        MINING.scanDig("Down")
+        bedrockPlunger()
     end
 end
 
