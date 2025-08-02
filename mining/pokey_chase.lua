@@ -258,7 +258,11 @@ function PokeholeMap:estimateFuel(hole_count)
             fuel_estimate = fuel_estimate + math.abs(manhattanVectorFromBottom.x) + math.abs(manhattanVectorFromBottom.y) + math.abs(manhattanVectorFromBottom.z)
         end
     end
-    return fuel_estimate
+    if fuel_estimate > turtle.getFuelLimit() then -- probably remove this and make some thing with only needing starting fuel for X number of holes
+        return turtle.getFuelLimit()
+    else
+        return fuel_estimate
+    end
 end
 
 
