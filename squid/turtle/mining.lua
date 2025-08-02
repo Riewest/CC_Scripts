@@ -1,12 +1,18 @@
 --A collection of mining focused functions to import
 
 local TAG_BLACKLIST = {
+    "sculk_replaceable_world_gen",
     "c:stones",
     "minecraft:dirt",
     "c:gravels",
     "c:cobblestones",
     "c:chests",
     "minecraft:features_cannot_replace",
+    "minecraft:flowers",
+    "minecraft:wall_post_override",
+    "minecraft:stairs",
+    "minecraft:slabs",
+    "minecraft:trapdoors",
     "computercraft:turtle"
 }
 
