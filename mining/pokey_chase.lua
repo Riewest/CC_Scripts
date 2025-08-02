@@ -41,9 +41,9 @@ local ROOT_COORD = vector.new(0,0,0)
 local DISTANCE_BETWEEN = 4 --Empty blocks between holes
 local DIST_MOD = DISTANCE_BETWEEN + 1
 local HOLE_BOTTOM = -59 -- Should be bedrock safe
-local MIN_HOLE_FUEL = 8
+local MIN_HOLE_FUEL = 50
 local MIN_STARTING_FUEL = 500
-local HOLES_BETWEEN_UNLOADS = 4
+local HOLES_BETWEEN_UNLOADS = 3
 
 -- Used in the map generation to make sure we always do the correct square in front of the turtle
 local XZ_MAP_MOD ={}
@@ -242,9 +242,9 @@ function PokeholeMap:estimateFuel(hole_count)
     -- Calculate fuel for holes
     local remaining_holes = #self.holes
     hole_count = hole_count or remaining_holes
-    -- if hole_count < MIN_HOLE_FUEL then
-    --     hole_count = MIN_HOLE_FUEL
-    -- end
+    if hole_count > MIN_HOLE_FUEL then
+        hole_count = MIN_HOLE_FUEL
+    end
     fuel_estimate = fuel_estimate + (hole_count * (hole_height + 12))
     
     --Calculate return from bottom and top of every hole. This should ensure plenty of fuel.
@@ -258,9 +258,10 @@ function PokeholeMap:estimateFuel(hole_count)
             fuel_estimate = fuel_estimate + math.abs(manhattanVectorFromBottom.x) + math.abs(manhattanVectorFromBottom.y) + math.abs(manhattanVectorFromBottom.z)
         end
     end
-    if fuel_estimate > turtle.getFuelLimit() then -- probably remove this and make some thing with only needing starting fuel for X number of holes
+    if fuel_estimate > turtle.getFuelLimit() then -- this is probably fine to keep in the event that somehow a MIN_HOLE_FUEL estimate exceeds the turtle's max capacity
         return turtle.getFuelLimit()
     else
+        print("Fuel Est: "..fuel_estimate)
         return fuel_estimate
     end
 end
@@ -281,7 +282,7 @@ local function refuel(amount)
             if turtle.getItemCount(n) > 0 then
                 turtle.select(n)
                 if turtle.refuel(1) then
-                    while turtle.getItemCount(n) > 0 and turtle.getFuelLevel() < needed do
+                    while turtle.getItemCount(n) > 0 and turtle.getFuelLevel() < turtle.getFuelLimit() do -- turtle.getFuelLevel() < needed
                         turtle.refuel(1)
                     end
                     if turtle.getFuelLevel() >= needed then
@@ -438,6 +439,7 @@ local function minePokeHoles()
         pokehole_map:nextHole()
         if holesSinceLastUnload > HOLES_BETWEEN_UNLOADS and nav.current_coord.y ~= HOLE_BOTTOM then
             holesSinceLastUnload = 0
+            MINING.purgeInventory()
             returnAndEmpty()
         end
     end
