@@ -42,6 +42,8 @@ local DISTANCE_BETWEEN = 4 --Empty blocks between holes
 local DIST_MOD = DISTANCE_BETWEEN + 1
 local HOLE_BOTTOM = -59 -- Should be bedrock safe
 local MIN_HOLE_FUEL = 8
+local MIN_STARTING_FUEL = 500
+local HOLES_BETWEEN_UNLOADS = 4
 
 -- Used in the map generation to make sure we always do the correct square in front of the turtle
 local XZ_MAP_MOD ={}
@@ -237,34 +239,25 @@ end
 function PokeholeMap:estimateFuel(hole_count)
     local fuel_estimate = 0
 
-    -- Calculate amount of fuel for holes
+    -- Calculate fuel for holes
     local remaining_holes = #self.holes
     hole_count = hole_count or remaining_holes
-    if remaining_holes < hole_count then
-        hole_count = remaining_holes
+    -- if hole_count < MIN_HOLE_FUEL then
+    --     hole_count = MIN_HOLE_FUEL
+    -- end
+    fuel_estimate = fuel_estimate + (hole_count * (hole_height + 12))
+    
+    --Calculate return from bottom and top of every hole. This should ensure plenty of fuel.
+    for holeNum = 1,#self.holes do
+        if holeNum % 4 == 0 then
+            local thisHole = self.holes[holeNum]
+            local thisHoleBottom = vector.new(thisHole.x, HOLE_BOTTOM, thisHole.z)
+            local manhattanVectorFromTop = self.start_coord:sub(thisHole)
+            local manhattanVectorFromBottom = self.start_coord:sub(thisHoleBottom)
+            fuel_estimate = fuel_estimate + math.abs(manhattanVectorFromTop.x) + math.abs(manhattanVectorFromTop.y) + math.abs(manhattanVectorFromTop.z)
+            fuel_estimate = fuel_estimate + math.abs(manhattanVectorFromBottom.x) + math.abs(manhattanVectorFromBottom.y) + math.abs(manhattanVectorFromBottom.z)
+        end
     end
-    fuel_estimate = fuel_estimate + (hole_count * hole_height)
-
-    -- Calculate amount of fuel for transitioning the surface
-    -- Going to modify by 1.1 just to be safe but in theory should be less than surface area
-    local surface_area =  math.ceil(self.size * self.size * 1.1)
-    fuel_estimate = fuel_estimate + surface_area
-
-    -- Calculate some value for offload trips
-    local offload_trips = hole_count / 2
-    local distance_to_opposite_corner = (self.size * 2) + hole_height
-    local offload_trip_fuel = offload_trips * distance_to_opposite_corner
-    fuel_estimate = fuel_estimate + offload_trip_fuel
-
-    -- Calculate fuel for home trip
-    local last_hole = self.holes[#self.holes]
-    local temp_last_hole = vector.new(last_hole.x, last_hole.y, last_hole.z)
-    temp_last_hole.y = HOLE_BOTTOM
-    local return_vector = self.start_coord:sub(temp_last_hole)
-    local return_fuel = return_vector.x + return_vector.y + return_vector.z
-    fuel_estimate = fuel_estimate + return_fuel
-
-    print("Fuel Est:",fuel_estimate)
     return fuel_estimate
 end
 
@@ -301,17 +294,20 @@ local function refuel(amount)
     return true
 end
 
-local function fuelCheck(startup_check)
-    if pokehole_map:completed() then
-        return
-    end
-    local fuel_estimate = pokehole_map:estimateFuel(MIN_HOLE_FUEL)
-    if not refuel(fuel_estimate) then
+local function fuelCheck(minFuel, startup_check)
+    if not refuel(minFuel) then
         if startup_check then
-            returnAndEmpty() --Go home if we don't have enough fuel
+            returnAndEmpty() -- Go home if we don't have enough fuel
         end
-        print("Waiting for fuel")
-        while not refuel(fuel_estimate) do
+        term.clear()
+        term.setCursorPos(1, 1)
+        print("FUEL REQUIRED")
+        print(" Current Fuel:  " .. turtle.getFuelLevel())
+        print("Required Fuel:  " .. minFuel)
+
+        while not refuel(minFuel) do
+            term.setCursorPos(1, 2)
+            print(" Current Fuel:  " .. turtle.getFuelLevel())
             os.pullEvent("turtle_inventory")
         end
     end
@@ -330,7 +326,7 @@ end
 function returnAndEmpty()
     local saved_location = copyVector(nav.current_coord)
     nav:goTo(nav.home_coord, chest_direction)
-    fuelCheck()
+    fuelCheck(pokehole_map:estimateFuel())
     empty()
     if not pokehole_map:completed() then
         nav:goTo(saved_location)
@@ -352,6 +348,7 @@ local function removeStartupFile()
 end
 
 local function startup()
+    fuelCheck(MIN_STARTING_FUEL)
     -- Initialize INS/nav object
     nav = INS.INS:new()
 
@@ -361,9 +358,9 @@ local function startup()
     -- Generate/Load PokeHole Map (Based on nav.home_coord and size)
     pokehole_map = PokeholeMap.new(size)
 
+    fuelCheck(pokehole_map:estimateFuel(),true)
     -- This will do a fuel check as well
     -- Might as well have the turtle clean its inv
-    fuelCheck(true)
 
     createStartupFile()
 end
@@ -412,11 +409,7 @@ local function doPokehole()
 end
 
 local function minePokeHoles()
-    -- local test_count = 0
-
-    -- if nav.current_coord:equals(nav.home_coord) then
-    --     nav:down()
-    -- end
+    local holesSinceLastUnload = 0
 
     -- Process Each Hole
     pokehole_map:nextHole()
@@ -437,11 +430,12 @@ local function minePokeHoles()
         end
 
         doPokehole()
+        holesSinceLastUnload = holesSinceLastUnload + 1
         pokehole_map:nextHole()
-        -- if (test_count % 3) == 0 then
-        --     returnAndEmpty()
-        -- end
-        -- test_count = test_count + 1
+        if holesSinceLastUnload > HOLES_BETWEEN_UNLOADS and nav.current_coord.y ~= HOLE_BOTTOM then
+            holesSinceLastUnload = 0
+            returnAndEmpty()
+        end
     end
 end
 
