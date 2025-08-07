@@ -22,6 +22,31 @@ local logDir = "logs"
 local logPath = string.format("%s/%s", logDir, logFile)
 
 
+local counterName = "ccscripts"
+local httpEndpoint = "https://riecount.suicidesquid.net/count?name=" .. counterName
+local postData = ""
+local count
+local label = "Squid_"
+
+local response = http.post(httpEndpoint, postData)
+
+if response then
+    local body = response.readAll()
+    response.close()
+    local ok, data = pcall(textutils.unserializeJSON, body)
+    if ok and type(data) == "table" and type(data.count) == "number" then
+        count = data.count
+    else
+        count = os.getComputerID()
+    end
+else
+    count = os.getComputerID()
+end
+label = label .. count
+
+print("Setting Label:",label)
+os.setComputerLabel(label)
+
 
 
 local rawHeaders = {
