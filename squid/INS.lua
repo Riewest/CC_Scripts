@@ -588,6 +588,8 @@ return {
     Directions = Directions,
     reverseDirection = reverseDirection,
     runExample = runExample,
-    pingServer = pingServer
+    pingServer = pingServer,
+    promptChoice = promptChoice,
+    promptInteger = promptInteger
 }
 
