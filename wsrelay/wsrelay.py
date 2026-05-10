@@ -4,7 +4,7 @@ import asyncio
 import json
 import logging
 
-from websockets.server import serve
+from websockets.asyncio.server import serve
 from websockets import broadcast
 from websockets.exceptions import ConnectionClosedError
 
@@ -25,21 +25,18 @@ logger.addHandler(ch)
 
 connected_clients = {}
 
-async def relay(websocket, path):
+async def relay(websocket):
     # Check if the "computer_id" header is present
-    computer_id = websocket.request_headers.get("computer_id")
+    computer_id = websocket.request.headers.get("computer_id")
     if not computer_id:
         logger.warning("Connection denied: Missing 'computer_id' header")
         await websocket.close()
         return
     
+    path = websocket.request.path
     # Initialize Path
     if path not in connected_clients:
         connected_clients[path] = dict()
-    
-    # If there was already a connection then close it
-    # if computer_id in connected_clients[path]:
-    #     await websocket.close()
 
     # Keep track of connected clients
     connected_clients[path][computer_id] = websocket
@@ -48,9 +45,13 @@ async def relay(websocket, path):
     try:
         # Handle incoming messages
         async for message in websocket:
+            
             logger.info(f"{path} {computer_id}: {message}")
             try:
                 json_object = json.loads(message)
+                if isinstance(json_object, dict) and "protocol" in json_object:
+                    json_object["subprotocol"] = json_object.pop("protocol")
+                    message = json.dumps(json_object)
                 # Broadcast the message to all clients on the same path
                 await pathBroadcast(path, message)
             except ValueError as e:
@@ -70,15 +71,9 @@ async def pathBroadcast(path, message):
     # Broadcast the message to all clients on the specified path
     if path in connected_clients and len(connected_clients[path]) > 0:
         broadcast(connected_clients[path].values(), message, raise_exceptions=False)
-        # for client in connected_clients[path].values():
-        #     try:
-        #         await client.send(message)
-        #     except asyncio.exceptions.IncompleteReadError:
-        #         pass
 
 async def main():
-    async with serve(relay, "0.0.0.0", 8765, compression=None):
-        logger.info("WSRelay Started... Time to Conquer the Server :)")
-        await asyncio.Future()  # run forever
+    async with serve(relay, "localhost", 8765) as server:
+        await server.serve_forever()
 
 asyncio.run(main())

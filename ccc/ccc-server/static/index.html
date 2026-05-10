@@ -1,0 +1,497 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>CCC Dashboard</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: system-ui, sans-serif;
+      background: #0f1117;
+      color: #d4d4d8;
+      padding: 2rem 2rem 10rem;
+    }
+
+    h1 {
+      font-size: 1.5rem;
+      font-weight: 600;
+      margin-bottom: 1.5rem;
+      color: #f4f4f5;
+    }
+
+    h2.channel {
+      font-size: 0.85rem;
+      font-weight: 500;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      color: #71717a;
+      margin: 1.5rem 0 0.75rem;
+      border-bottom: 1px solid #27272a;
+      padding-bottom: 0.4rem;
+    }
+
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+      gap: 1rem;
+      align-items: start;
+    }
+
+    .card {
+      background: #18181b;
+      border: 1px solid #27272a;
+      border-radius: 0.6rem;
+      padding: 1rem;
+      cursor: pointer;
+      transition: border-color 0.15s;
+    }
+
+    .card.selected {
+      border-color: #52525b;
+    }
+
+    .card-header {
+      display: flex;
+      align-items: center;
+      gap: 0.6rem;
+      margin-bottom: 0.5rem;
+    }
+
+    .badge {
+      font-size: 0.7rem;
+      font-weight: 600;
+      padding: 0.2rem 0.5rem;
+      border-radius: 9999px;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+
+    .badge-turtle   { background: #16a34a22; color: #4ade80; border: 1px solid #16a34a55; }
+    .badge-pocket   { background: #2563eb22; color: #60a5fa; border: 1px solid #2563eb55; }
+    .badge-computer { background: #7c3aed22; color: #a78bfa; border: 1px solid #7c3aed55; }
+    .badge-unknown  { background: #3f3f4622; color: #a1a1aa; border: 1px solid #3f3f4655; }
+
+    .computer-id {
+      font-size: 0.9rem;
+      font-weight: 600;
+      color: #f4f4f5;
+    }
+
+    .computer-label {
+      font-size: 0.8rem;
+      color: #71717a;
+    }
+
+    details {
+      margin-top: 0.75rem;
+    }
+
+    summary {
+      cursor: pointer;
+      font-size: 0.78rem;
+      color: #52525b;
+      user-select: none;
+      list-style: none;
+      display: flex;
+      align-items: center;
+      gap: 0.4rem;
+    }
+
+    summary::before {
+      content: "▶";
+      font-size: 0.6rem;
+      transition: transform 0.15s;
+    }
+
+    details[open] summary::before {
+      transform: rotate(90deg);
+    }
+
+    summary:hover { color: #a1a1aa; }
+
+    .telemetry-table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 0.6rem;
+      font-size: 0.78rem;
+    }
+
+    .telemetry-table th {
+      text-align: left;
+      color: #52525b;
+      font-weight: 500;
+      padding: 0.25rem 0.4rem;
+      width: 40%;
+    }
+
+    .telemetry-table td {
+      color: #a1a1aa;
+      padding: 0.25rem 0.4rem;
+      word-break: break-all;
+    }
+
+    .telemetry-table tr:hover td,
+    .telemetry-table tr:hover th {
+      background: #27272a;
+    }
+
+    .section-heading {
+      font-size: 0.72rem;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      color: #52525b;
+      margin: 0.6rem 0 0.2rem;
+    }
+
+    .empty {
+      color: #52525b;
+      font-size: 0.9rem;
+      margin-top: 2rem;
+    }
+
+    #status {
+      font-size: 0.75rem;
+      color: #52525b;
+      margin-bottom: 1rem;
+    }
+
+    #search {
+      display: block;
+      width: 100%;
+      max-width: 360px;
+      background: #18181b;
+      border: 1px solid #3f3f46;
+      border-radius: 0.4rem;
+      color: #d4d4d8;
+      font-size: 0.85rem;
+      padding: 0.4rem 0.7rem;
+      margin-bottom: 1rem;
+      outline: none;
+    }
+
+    #search:focus {
+      border-color: #52525b;
+    }
+
+    #search::placeholder { color: #52525b; }
+
+    #cmd-panel {
+      display: none;
+      position: fixed;
+      bottom: 0; left: 0; right: 0;
+      background: #18181b;
+      border-top: 1px solid #27272a;
+      padding: 0.75rem 2rem 1rem;
+      z-index: 10;
+    }
+
+    #cmd-panel.visible { display: block; }
+
+    #cmd-panel-header {
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+      margin-bottom: 0.5rem;
+    }
+
+    #cmd-target {
+      font-size: 0.82rem;
+      color: #a1a1aa;
+      flex: 1;
+    }
+
+    #cmd-deselect {
+      background: none;
+      border: 1px solid #3f3f46;
+      color: #71717a;
+      border-radius: 0.3rem;
+      cursor: pointer;
+      padding: 0.2rem 0.5rem;
+      font-size: 0.75rem;
+    }
+
+    #cmd-deselect:hover { border-color: #52525b; color: #a1a1aa; }
+
+    #cmd-row {
+      display: flex;
+      gap: 0.5rem;
+      align-items: flex-end;
+    }
+
+    #cmd-code {
+      flex: 1;
+      background: #0f1117;
+      border: 1px solid #3f3f46;
+      border-radius: 0.4rem;
+      color: #d4d4d8;
+      font-family: monospace;
+      font-size: 0.82rem;
+      padding: 0.4rem 0.6rem;
+      resize: vertical;
+      min-height: 2.2rem;
+      max-height: 8rem;
+      outline: none;
+    }
+
+    #cmd-code:focus { border-color: #52525b; }
+
+    #cmd-send {
+      background: #27272a;
+      border: 1px solid #3f3f46;
+      border-radius: 0.4rem;
+      color: #d4d4d8;
+      cursor: pointer;
+      padding: 0.4rem 1rem;
+      font-size: 0.82rem;
+      white-space: nowrap;
+    }
+
+    #cmd-send:hover { background: #3f3f46; }
+
+    #cmd-status {
+      font-size: 0.75rem;
+      margin-top: 0.4rem;
+      color: #52525b;
+    }
+
+    #cmd-status.ok  { color: #4ade80; }
+    #cmd-status.err { color: #f87171; }
+  </style>
+</head>
+<body>
+  <h1>CCC Dashboard</h1>
+  <input id="search" type="search" placeholder="Filter by ID or label…" />
+  <div id="status">Connecting…</div>
+  <div id="root"></div>
+
+  <div id="cmd-panel">
+    <div id="cmd-panel-header">
+      <span id="cmd-target"></span>
+      <button id="cmd-deselect">✕ Deselect</button>
+    </div>
+    <div id="cmd-row">
+      <textarea id="cmd-code" rows="1" placeholder="Lua code to run… (Ctrl+Enter to send)"></textarea>
+      <button id="cmd-send">Send</button>
+    </div>
+    <div id="cmd-status"></div>
+  </div>
+
+  <script>
+    function getBadge(isT, isP) {
+      if (isT === true)  return { cls: "badge-turtle",   label: "Turtle" };
+      if (isP === true)  return { cls: "badge-pocket",   label: "Pocket" };
+      if (isT === false) return { cls: "badge-computer", label: "Computer" };
+      return { cls: "badge-unknown", label: "Unknown" };
+    }
+
+    function esc(v) {
+      if (v === null || v === undefined) return "—";
+      return String(v).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");
+    }
+
+    function renderRows(obj, skip) {
+      return Object.entries(obj)
+        .filter(([k]) => !skip || !skip.includes(k))
+        .map(([k, v]) => {
+          const display = (v !== null && typeof v === "object") ? JSON.stringify(v) : esc(v);
+          return `<tr><th>${esc(k)}</th><td>${display}</td></tr>`;
+        }).join("");
+    }
+
+    function renderTelemetry(t) {
+      if (!t || Object.keys(t).length === 0) return "<em>No telemetry received yet.</em>";
+
+      const topSkip = ["turtle", "peripherals", "inventory", "is_turtle", "is_pocket"];
+      let html = `<table class="telemetry-table">${renderRows(t, topSkip)}</table>`;
+
+      if (t.peripherals && Object.keys(t.peripherals).length > 0) {
+        html += `<p class="section-heading">Peripherals</p>`;
+        html += `<table class="telemetry-table">${renderRows(t.peripherals)}</table>`;
+      }
+
+      if (t.turtle) {
+        const turtleSkip = ["inventory", "left_tool", "right_tool"];
+        html += `<p class="section-heading">Turtle</p>`;
+        html += `<table class="telemetry-table">${renderRows(t.turtle, turtleSkip)}</table>`;
+
+        if (t.turtle.left_tool || t.turtle.right_tool) {
+          html += `<p class="section-heading">Tools</p>`;
+          html += `<table class="telemetry-table">`;
+          if (t.turtle.left_tool)  html += `<tr><th>left</th><td>${esc(t.turtle.left_tool.name)}</td></tr>`;
+          if (t.turtle.right_tool) html += `<tr><th>right</th><td>${esc(t.turtle.right_tool.name)}</td></tr>`;
+          html += `</table>`;
+        }
+
+        if (t.turtle.inventory) {
+          const slots = Object.entries(t.turtle.inventory).filter(([, v]) => v !== null);
+          if (slots.length > 0) {
+            html += `<p class="section-heading">Inventory</p>`;
+            html += `<table class="telemetry-table">`;
+            slots.forEach(([slot, item]) => {
+              html += `<tr><th>slot ${esc(slot)}</th><td>${esc(item.name)} ×${esc(item.count)}</td></tr>`;
+            });
+            html += `</table>`;
+          }
+        }
+      }
+
+      return html;
+    }
+
+    function renderCard(comp, channel) {
+      const badge = getBadge(comp.is_turtle, comp.is_pocket);
+      return `
+        <div class="card" data-channel="${esc(channel)}" data-cid="${esc(comp.id)}">
+          <div class="card-header">
+            <span class="badge ${badge.cls}">${badge.label}</span>
+            <span class="computer-id">ID ${esc(comp.id)}</span>
+          </div>
+          ${comp.label ? `<div class="computer-label">${esc(comp.label)}</div>` : ""}
+          <details data-cid="${esc(comp.id)}">
+            <summary>Telemetry</summary>
+            ${renderTelemetry(comp.telemetry)}
+          </details>
+        </div>`;
+    }
+
+    let lastData = {};
+
+    function matches(comp, query) {
+      if (!query) return true;
+      const q = query.toLowerCase();
+      return String(comp.id).toLowerCase().includes(q) ||
+             (comp.label && comp.label.toLowerCase().includes(q));
+    }
+
+    function render(data) {
+      lastData = data;
+      const root = document.getElementById("root");
+      const query = document.getElementById("search").value;
+      const channels = Object.entries(data);
+
+      // Preserve which details panels are currently open
+      const openIds = new Set(
+        [...root.querySelectorAll("details[data-cid][open]")].map(el => el.dataset.cid)
+      );
+
+      const filteredChannels = channels.map(([channel, computers]) => {
+        const filtered = Object.values(computers).filter(c => matches(c, query));
+        return [channel, filtered];
+      }).filter(([, computers]) => computers.length > 0);
+
+      if (filteredChannels.length === 0) {
+        root.innerHTML = `<p class="empty">${query ? "No computers match your search." : "No computers connected."}</p>`;
+        return;
+      }
+
+      root.innerHTML = filteredChannels.map(([channel, computers]) => {
+        const cards = computers.map(c => renderCard(c, channel)).join("");
+        return `<h2 class="channel">${esc(channel)}</h2><div class="grid">${cards}</div>`;
+      }).join("");
+
+      // Restore open state
+      root.querySelectorAll("details[data-cid]").forEach(el => {
+        if (openIds.has(el.dataset.cid)) el.open = true;
+      });
+
+      // Restore selection
+      if (selectedChannel && selectedCid) {
+        const sel = root.querySelector(`.card[data-channel="${selectedChannel}"][data-cid="${selectedCid}"]`);
+        if (sel) sel.classList.add("selected");
+        else deselectComputer();
+      }
+    }
+
+    async function poll() {
+      try {
+        const res = await fetch("/api/computers");
+        const data = await res.json();
+        render(data);
+        document.getElementById("status").textContent =
+          `Last updated: ${new Date().toLocaleTimeString()}`;
+      } catch (e) {
+        document.getElementById("status").textContent = `Error: ${e.message}`;
+      }
+    }
+
+    document.getElementById("search").addEventListener("input", () => render(lastData));
+
+    let selectedChannel = null, selectedCid = null;
+
+    function selectComputer(channel, cid) {
+      selectedChannel = channel;
+      selectedCid = cid;
+      const root = document.getElementById("root");
+      root.querySelectorAll(".card.selected").forEach(el => el.classList.remove("selected"));
+      const sel = root.querySelector(`.card[data-channel="${channel}"][data-cid="${cid}"]`);
+      if (sel) sel.classList.add("selected");
+      const comp = (lastData[channel] || {})[cid];
+      const label = comp ? (comp.label || `ID ${cid}`) : `ID ${cid}`;
+      document.getElementById("cmd-target").textContent = `Target: ${label} (ID ${cid})`;
+      document.getElementById("cmd-panel").classList.add("visible");
+      document.getElementById("cmd-status").textContent = "";
+      document.getElementById("cmd-status").className = "";
+    }
+
+    function deselectComputer() {
+      selectedChannel = null;
+      selectedCid = null;
+      document.getElementById("root").querySelectorAll(".card.selected").forEach(el => el.classList.remove("selected"));
+      document.getElementById("cmd-panel").classList.remove("visible");
+    }
+
+    document.getElementById("root").addEventListener("click", e => {
+      const card = e.target.closest(".card");
+      if (!card) return;
+      if (e.target.closest("details")) return; // don't intercept telemetry expand
+      const channel = card.dataset.channel;
+      const cid = card.dataset.cid;
+      if (selectedChannel === channel && selectedCid === cid) {
+        deselectComputer();
+      } else {
+        selectComputer(channel, cid);
+      }
+    });
+
+    document.getElementById("cmd-deselect").addEventListener("click", deselectComputer);
+
+    document.getElementById("cmd-send").addEventListener("click", async () => {
+      const code = document.getElementById("cmd-code").value.trim();
+      const statusEl = document.getElementById("cmd-status");
+      if (!code || !selectedChannel || !selectedCid) return;
+      statusEl.textContent = "Sending\u2026";
+      statusEl.className = "";
+      try {
+        const res = await fetch("/api/command", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ channel: selectedChannel, computer_id: selectedCid, code }),
+        });
+        const data = await res.json();
+        if (data.ok) {
+          statusEl.textContent = "Sent.";
+          statusEl.className = "ok";
+        } else {
+          statusEl.textContent = `Error: ${data.error}`;
+          statusEl.className = "err";
+        }
+      } catch (err) {
+        statusEl.textContent = `Error: ${err.message}`;
+        statusEl.className = "err";
+      }
+    });
+
+    document.getElementById("cmd-code").addEventListener("keydown", e => {
+      if (e.key === "Enter" && e.ctrlKey) {
+        e.preventDefault();
+        document.getElementById("cmd-send").click();
+      }
+    });
+
+    poll();
+    setInterval(poll, 3000);
+  </script>
+</body>
+</html>
