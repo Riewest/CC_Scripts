@@ -7,16 +7,35 @@ if not turtle then
 end
 
 local tArgs = { ... }
-if #tArgs ~= 1 then
+if #tArgs < 1 or #tArgs > 5 then
     local programName = arg[0] or fs.getName(shell.getRunningProgram())
-    print("Usage: " .. programName .. " <diameter>")
+    print("Usage: " .. programName .. " <diameter> [start height] [bottom depth] [holes between unload] [filter name]")
     return
 end
 
 -- Mine in a quarry pattern until we hit something we can't dig
 local size = tonumber(tArgs[1])
-if size < 1 then
+local requested_start_height = tArgs[2] and tonumber(tArgs[2]) or nil
+local requested_bottom_depth = tArgs[3] and tonumber(tArgs[3]) or nil
+local requested_holes_between_unloads = tArgs[4] and tonumber(tArgs[4]) or nil
+local requested_filter_name = tArgs[5] or "default"
+if not size or size < 1 then
     print("Excavate diameter must be positive")
+    return
+end
+
+if tArgs[2] and not requested_start_height then
+    print("Start height must be a number")
+    return
+end
+
+if tArgs[3] and not requested_bottom_depth then
+    print("Bottom depth must be a number")
+    return
+end
+
+if tArgs[4] and (not requested_holes_between_unloads or requested_holes_between_unloads < 0) then
+    print("Holes between unload must be zero or greater")
     return
 end
 
@@ -24,7 +43,7 @@ end
 --- Imports and Globals
 ---------------------------------
 
-package.path = package.path .. ";/?;/?.lua;/?/init.lua;/squid/?;/squid/?.lua;/squid/turtle/?.lua;/squid/?/init.lua"
+package.path = package.path .. ";/?;/?.lua;/?/init.lua;/squid/?;/squid/?.lua;/squid/turtle/?.lua;/squid/?/init.lua;/CC_Scripts/squid/?;/CC_Scripts/squid/?.lua;/CC_Scripts/squid/turtle/?.lua;/CC_Scripts/squid/?/init.lua"
 
 local INS = require("INS")
 local MINING = require("mining")
@@ -34,16 +53,20 @@ local nav
 local pokehole_map
 local chest_direction
 local hole_height
+local hole_top
 local returnAndEmpty
 
 -- The Root Poke Hole to calculate all others in the world :)
 local ROOT_COORD = vector.new(0,0,0)
 local DISTANCE_BETWEEN = 4 --Empty blocks between holes
 local DIST_MOD = DISTANCE_BETWEEN + 1
-local HOLE_BOTTOM = -59 -- Should be bedrock safe
+local DEFAULT_HOLE_BOTTOM = -59
+local HOLE_BOTTOM = DEFAULT_HOLE_BOTTOM
 local MIN_HOLE_FUEL = 50
 local MIN_STARTING_FUEL = 500
-local HOLES_BETWEEN_UNLOADS = 3
+local DEFAULT_HOLES_BETWEEN_UNLOADS = 3
+local HOLES_BETWEEN_UNLOADS = requested_holes_between_unloads or DEFAULT_HOLES_BETWEEN_UNLOADS
+local use_bedrock_plunge = (requested_bottom_depth == nil or requested_bottom_depth == DEFAULT_HOLE_BOTTOM)
 
 -- Used in the map generation to make sure we always do the correct square in front of the turtle
 local XZ_MAP_MOD ={}
@@ -112,9 +135,11 @@ function PokeholeMap.new(size)
     local self = setmetatable({}, PokeholeMap)
     self.size = size
     self.start_coord = nav.home_coord
+    self.start_height = hole_top
+    self.bottom_depth = HOLE_BOTTOM
     
     -- Create a unique file to name this pokehole run
-    self.map_filepath = string.lower(string.format("%s/%s_%s_%s_%s_%s" .. MAP_FILE_BASE,MAP_DIR, size, nav:getDisplayDir(nav.home_direction), self.start_coord.x, self.start_coord.y, self.start_coord.z))
+    self.map_filepath = string.lower(string.format("%s/%s_%s_%s_%s_%s_%s_%s_%s", MAP_DIR, size, nav:getDisplayDir(nav.home_direction), self.start_coord.x, self.start_coord.y, self.start_coord.z, self.start_height, self.bottom_depth, MAP_FILE_BASE))
 
     self:load()
 
@@ -197,7 +222,7 @@ function PokeholeMap:generate()
         local z_map = {}
         for z_diff=0, self.size-1 do
             local z = self.start_coord.z + (z_diff * map_mod.z)
-            local check_coord = vector.new(x, self.start_coord.y, z)
+            local check_coord = vector.new(x, self.start_height, z)
             if isPokeHole(check_coord) then
                 table.insert(z_map, check_coord)
             end
@@ -252,7 +277,8 @@ function PokeholeMap:estimateFuel(hole_count)
         if holeNum % 4 == 0 then
             local thisHole = self.holes[holeNum]
             local thisHoleBottom = vector.new(thisHole.x, HOLE_BOTTOM, thisHole.z)
-            local manhattanVectorFromTop = self.start_coord:sub(thisHole)
+            local thisHoleTop = vector.new(thisHole.x, self.start_height, thisHole.z)
+            local manhattanVectorFromTop = self.start_coord:sub(thisHoleTop)
             local manhattanVectorFromBottom = self.start_coord:sub(thisHoleBottom)
             fuel_estimate = fuel_estimate + math.abs(manhattanVectorFromTop.x) + math.abs(manhattanVectorFromTop.y) + math.abs(manhattanVectorFromTop.z)
             fuel_estimate = fuel_estimate + math.abs(manhattanVectorFromBottom.x) + math.abs(manhattanVectorFromBottom.y) + math.abs(manhattanVectorFromBottom.z)
@@ -328,15 +354,48 @@ local function empty()
     end
 end
 
+local function getHomeShaftCoord(y)
+    return vector.new(nav.home_coord.x, y, nav.home_coord.z)
+end
+
+local function goHomeViaShaft()
+    local home_shaft_coord = getHomeShaftCoord(nav.current_coord.y)
+    if not nav.current_coord:equals(home_shaft_coord) then
+        nav:goTo(home_shaft_coord)
+    end
+
+    if not nav.current_coord:equals(nav.home_coord) or nav.direction ~= chest_direction then
+        nav:goTo(nav.home_coord, chest_direction)
+    end
+end
+
+local function returnViaHomeShaft(destination)
+    local return_shaft_coord = getHomeShaftCoord(destination.y)
+    if not nav.current_coord:equals(return_shaft_coord) then
+        nav:goTo(return_shaft_coord)
+    end
+
+    if not nav.current_coord:equals(destination) then
+        nav:goTo(destination)
+    end
+end
+
+local function goToStartHeightViaShaft()
+    local start_shaft_coord = getHomeShaftCoord(hole_top)
+    if not nav.current_coord:equals(start_shaft_coord) then
+        nav:goTo(start_shaft_coord)
+    end
+end
+
 function returnAndEmpty()
     local saved_location = copyVector(nav.current_coord)
-    nav:goTo(nav.home_coord, chest_direction)
+    goHomeViaShaft()
     fuelCheck(pokehole_map:estimateFuel())
     empty()
     if not pokehole_map:completed() then
-        nav:goTo(saved_location)
+        returnViaHomeShaft(saved_location)
     else
-        nav:goHome()
+        goHomeViaShaft()
     end
 end
 
@@ -353,11 +412,19 @@ local function removeStartupFile()
 end
 
 local function startup()
+    MINING.setFilter(requested_filter_name)
     fuelCheck(MIN_STARTING_FUEL)
     -- Initialize INS/nav object
     nav = INS.INS:new()
 
-    hole_height = nav.home_coord.y - HOLE_BOTTOM
+    hole_top = requested_start_height or nav.home_coord.y
+    HOLE_BOTTOM = requested_bottom_depth or DEFAULT_HOLE_BOTTOM
+    if hole_top < HOLE_BOTTOM then
+        print("Start height must be greater than or equal to bottom depth")
+        error()
+    end
+
+    hole_height = hole_top - HOLE_BOTTOM
 
     chest_direction = INS.reverseDirection(nav.home_direction)
     -- Generate/Load PokeHole Map (Based on nav.home_coord and size)
@@ -366,6 +433,8 @@ local function startup()
     fuelCheck(pokehole_map:estimateFuel(),true)
     -- This will do a fuel check as well
     -- Might as well have the turtle clean its inv
+
+    goToStartHeightViaShaft()
 
     createStartupFile()
 end
@@ -403,13 +472,17 @@ end
 local function doPokehole()
     scanLayer()
     if nav.current_coord.y == HOLE_BOTTOM then
-        bedrockPlunger()
+        if use_bedrock_plunge then
+            bedrockPlunger()
+        end
         nav:up(hole_height, scanLayer)
         MINING.scanDig("Up")
     else
         MINING.scanDig("Up")
         nav:down(hole_height, scanLayer)
-        bedrockPlunger()
+        if use_bedrock_plunge then
+            bedrockPlunger()
+        end
     end
 end
 
@@ -421,7 +494,7 @@ local function minePokeHoles()
     while pokehole_map.current_hole do
         local travelTo = copyVector(pokehole_map.current_hole)
         -- Figure out if I'm closer to the bottom or top (AKA "Am I high")
-        travelTo.y = (math.abs(nav.current_coord.y - nav.home_coord.y) < math.abs(nav.current_coord.y - HOLE_BOTTOM)) and nav.home_coord.y or HOLE_BOTTOM
+        travelTo.y = (math.abs(nav.current_coord.y - hole_top) < math.abs(nav.current_coord.y - HOLE_BOTTOM)) and hole_top or HOLE_BOTTOM
 
         -- Travel to the top or bottom of next pokehole
         if nav.current_coord.y == HOLE_BOTTOM then
