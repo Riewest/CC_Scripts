@@ -12,10 +12,12 @@ logger.addHandler(ch)
 
 
 class Computer:
-    def __init__(self, computer_id, websocket):
+    def __init__(self, computer_id, websocket, is_advanced=False, label=None):
         self.computer_id = computer_id
+        self.label = label
         self.websocket = websocket
         self._telemetry = None
+        self.is_advanced = is_advanced
 
     @property
     def telemetry(self):

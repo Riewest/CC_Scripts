@@ -10,7 +10,9 @@ local ip = "ws://127.0.0.1:8766"
 local channel = "squidbot"
 
 local PING_RATE = 5 -- Seconds
-local controller_ws = WS.WSControl.new(ip, channel)
+
+local controller_ws = WS.WSControl.new(ip, channel, telemetry.telemetryParams())
+
 
 local function transmitTelemetry()
     log:info("Starting telemetry transmission...")

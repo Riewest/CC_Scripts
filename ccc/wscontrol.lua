@@ -6,13 +6,24 @@ local DEFAULT_PROTOCOL = "default"
 local WSControl = {}
 WSControl.__index = WSControl
 
-function WSControl.new(ip, channel)
+function buildParamsString(params)
+    local paramParts = {}
+    for k, v in pairs(params) do
+        table.insert(paramParts, string.format("%s=%s", k, tostring(v)))
+    end
+    return table.concat(paramParts, "&")
+end
+
+function WSControl.new(ip, channel, params)
     local self = setmetatable({}, WSControl)
+    local params = params or {}
     expect(1, ip, "string")
     expect(2, channel, "string")
+    expect(3, params, "table")
     self.ip = ip
     self.channel = channel
-    self.wsip = string.format("%s/%s", ip, channel)
+    self.params = params
+    self.wsip = string.format("%s/%s?%s", ip, channel, buildParamsString(params))
     local headers = {["computer_id"] = tostring(os.getComputerID())}
     self.ws = assert(http.websocket(self.wsip, headers))
     return self

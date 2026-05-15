@@ -9,7 +9,8 @@ from http.server import BaseHTTPRequestHandler, HTTPServer
 
 
 from protocols import Protocols
-from computer import Computer
+from computers.computer import Computer
+from computers.factory import create_computer
 
 from websockets.asyncio.server import serve
 from websockets import broadcast
@@ -56,32 +57,38 @@ async def recieve(websocket):
         await websocket.close()
         return
     
+    connecting_computer = create_computer(computer_id, websocket)
+
     path = websocket.request.path
+
+    group = type(connecting_computer).__name__
     # Initialize Path
-    if path not in connected_computers:
-        connected_computers[path] = dict()
+    if group not in connected_computers:
+        connected_computers[group] = dict()
 
+    
     # Keep track of connected clients
-    connected_computers[path][computer_id] = Computer(computer_id, websocket)
+    connected_computers[group][computer_id] = connecting_computer
 
-    logger.info(f"Computer {computer_id} Connected - Channel: {path}")
+
+    logger.info(f"Computer {computer_id} Connected - Type: {group}")
     try:
         # Handle incoming messages
         async for message in websocket:
             try:
-                processMessages(connected_computers[path][computer_id], message)
+                processMessages(connected_computers[group][computer_id], message)
             except Exception as e:
                 logger.error(f"Error processing message: {e}")
     
     except ConnectionClosedError:
-        if computer_id in connected_computers[path]:
-            del connected_computers[path][computer_id]
-            logger.info(f"Computer {computer_id} Disconnected - Channel: {path}")
+        if computer_id in connected_computers[group]:
+            del connected_computers[group][computer_id]
+            logger.info(f"Computer {computer_id} Disconnected - Type: {group}")
     finally:
         # Remove the client when they disconnect
-        if computer_id in connected_computers[path]:
-            del connected_computers[path][computer_id]
-            logger.info(f"Computer {computer_id} Disconnected - Channel: {path}")
+        if computer_id in connected_computers[group]:
+            del connected_computers[group][computer_id]
+            logger.info(f"Computer {computer_id} Disconnected - Type: {group}")
 
 async def pathBroadcast(path, message):
     # Broadcast the message to all clients on the specified path
