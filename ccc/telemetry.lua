@@ -57,11 +57,15 @@ local function getLabel()
 end
 
 local STATUS_FILE = "/.status"
+local STATUSES = require("status")
 
-local function setStatus(s)
+local function setStatus(status)
+    if not STATUSES[status:upper()] then
+        error("telemetry: invalid status: " .. tostring(status), 2)
+    end
     local ok, err = pcall(function()
         local file = fs.open(STATUS_FILE, "w")
-        file.write(textutils.serializeJSON(s))
+        file.write(textutils.serializeJSON(status))
         file.close()
     end)
     if not ok then
@@ -155,6 +159,7 @@ local function telemetryParams()
     return {
         computerID = os.getComputerID(),
         computerLabel = getLabel(),
+        status = getStatus(),
         isMining = isMining(),
         isCrafty = isCrafty(),
         isFelling = isFelling(),

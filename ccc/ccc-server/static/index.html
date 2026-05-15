@@ -84,6 +84,38 @@
       color: #71717a;
     }
 
+    .computer-meta {
+      display: flex;
+      align-items: center;
+      gap: 0.4rem;
+      margin-top: 0.4rem;
+      flex-wrap: wrap;
+    }
+
+    .computer-id-pill {
+      display: inline-block;
+      font-size: 0.75rem;
+      border-radius: 9999px;
+      padding: 0.15rem 0.55rem;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+      color: #a1a1aa;
+      background: #27272a;
+      border: 1px solid #3f3f46;
+    }
+
+    .computer-status {
+      display: inline-block;
+      font-size: 0.75rem;
+      border-radius: 9999px;
+      padding: 0.15rem 0.55rem;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+      /* colors applied dynamically via statusStyle() */
+    }
+
     details {
       margin-top: 0.75rem;
     }
@@ -279,6 +311,8 @@
   </div>
 
   <script>
+    let statusColors = {};
+
     function getBadge(isT, isP) {
       if (isT === true)  return { cls: "badge-turtle",   label: "Turtle" };
       if (isP === true)  return { cls: "badge-pocket",   label: "Pocket" };
@@ -340,15 +374,24 @@
       return html;
     }
 
+    function statusStyle(status) {
+      const c = statusColors[status];
+      if (!c) return "";
+      return `background:${c.background};color:${c.color};border:${c.border};`;
+    }
+
     function renderCard(comp, channel) {
       const badge = getBadge(comp.is_turtle, comp.is_pocket);
       return `
         <div class="card" data-channel="${esc(channel)}" data-cid="${esc(comp.id)}">
           <div class="card-header">
             <span class="badge ${badge.cls}">${badge.label}</span>
-            <span class="computer-id">ID ${esc(comp.id)}</span>
+            <span class="computer-id">${comp.label ? esc(comp.label) : `ID ${esc(comp.id)}`}</span>
           </div>
-          ${comp.label ? `<div class="computer-label">${esc(comp.label)}</div>` : ""}
+          <div class="computer-meta">
+            <span class="computer-id-pill">ID ${esc(comp.id)}</span>
+            ${comp.status ? `<span class="computer-status" style="${statusStyle(comp.status)}">${esc(comp.status)}</span>` : ""}
+          </div>
           <details data-cid="${esc(comp.id)}">
             <summary>Telemetry</summary>
             ${renderTelemetry(comp.telemetry)}
@@ -492,6 +535,8 @@
 
     poll();
     setInterval(poll, 3000);
+
+    fetch("/api/status-colors").then(r => r.json()).then(d => { statusColors = d; });
   </script>
 </body>
 </html>

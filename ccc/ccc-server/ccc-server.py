@@ -11,6 +11,7 @@ from http.server import BaseHTTPRequestHandler, HTTPServer
 from protocols import Protocols
 from computers.computer import Computer
 from computers.factory import create_computer
+from status import STATUS_COLORS
 
 from websockets.asyncio.server import serve
 from websockets import broadcast
@@ -110,6 +111,7 @@ def serialize_computers():
                 "label": t.get("label"),
                 "is_turtle": t.get("is_turtle"),
                 "is_pocket": t.get("is_pocket"),
+                "status": computer.status,
                 "telemetry": t,
             }
     return result
@@ -134,6 +136,12 @@ class DashboardHandler(BaseHTTPRequestHandler):
                 self.wfile.write(b"index.html not found")
         elif self.path == "/api/computers":
             data = json.dumps(serialize_computers())
+            self.send_response(200)
+            self.send_header("Content-Type", "application/json")
+            self.end_headers()
+            self.wfile.write(data.encode())
+        elif self.path == "/api/status-colors":
+            data = json.dumps({k.value: v for k, v in STATUS_COLORS.items()})
             self.send_response(200)
             self.send_header("Content-Type", "application/json")
             self.end_headers()

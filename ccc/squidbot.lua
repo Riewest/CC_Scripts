@@ -3,6 +3,7 @@
 local WS = require("wscontrol")
 local telemetry = require("telemetry")
 local PROTOCOLS = require("protocols")
+local STATUSES = require("status")
 local logger = require("logger")
 
 local log = logger.new("squidbot", { level = logger.DEBUG, file = "squidbot.log" })
@@ -27,17 +28,21 @@ local function runCommand(packet)
     local func, err = load(packet.data, "command", "t", _ENV)
         log:debug("Received command: %s", packet.data)
         if func then
+            telemetry.setStatus(STATUSES.WORKING)
             local success, result = pcall(func)
             if success then
                 log:debug("command executed successfully")
                 controller_ws:send({ type = "result", result = result }, PROTOCOLS.COMMAND_SUCCESS)
+                telemetry.setStatus(STATUSES.IDLE)
             else
                 log:error("command runtime error: %s", result)
                 controller_ws:send({ type = "error", error = result }, PROTOCOLS.COMMAND_ERROR)
+                telemetry.setStatus(STATUSES.IDLE)
             end
         else
             log:error("command compile error: %s", err)
             controller_ws:send({ type = "error", error = err }, PROTOCOLS.COMMAND_ERROR)
+            telemetry.setStatus(STATUSES.IDLE)
         end
 end
 
@@ -54,6 +59,7 @@ end
 
 
 local function main()
+    telemetry.setStatus(STATUSES.IDLE)
     parallel.waitForAll(
         transmitTelemetry,
         startListening
