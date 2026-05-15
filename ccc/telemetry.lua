@@ -56,6 +56,36 @@ local function getLabel()
     return os.getComputerLabel() or ("Unnamed Computer #" .. tostring(os.getComputerID()))
 end
 
+local STATUS_FILE = "/.status"
+
+local function setStatus(s)
+    local ok, err = pcall(function()
+        local file = fs.open(STATUS_FILE, "w")
+        file.write(textutils.serializeJSON(s))
+        file.close()
+    end)
+    if not ok then
+        printError("telemetry: failed to write status: " .. tostring(err))
+    end
+end
+
+local function getStatus()
+    if not fs.exists(STATUS_FILE) then return nil end
+    local ok, result = pcall(function()
+        local file = fs.open(STATUS_FILE, "r")
+        local raw = file.readAll()
+        file.close()
+        return textutils.unserializeJSON(raw)
+    end)
+    if ok then return result else return nil end
+end
+
+local function clearStatus()
+    if fs.exists(STATUS_FILE) then
+        fs.delete(STATUS_FILE)
+    end
+end
+
 
 local function getComputerState()
     local state = {
@@ -69,6 +99,7 @@ local function getComputerState()
         is_pocket = isPocket(),
         is_advanced = isAdvanced(),
         peripherals = {},
+        status = getStatus(),
     }
 
     local w, h = term.getSize()
@@ -142,8 +173,10 @@ return {
     getComputerState = getComputerState,
     getComputerStateJSON = getComputerStateJSON,
     saveStateToFile = saveStateToFile,
-    sendTelemetry = sendTelemetry,
     telemetryParams = telemetryParams,
+    setStatus = setStatus,
+    getStatus = getStatus,
+    clearStatus = clearStatus,
     isMining = isMining,
     isCrafty = isCrafty,
     isFelling = isFelling,
