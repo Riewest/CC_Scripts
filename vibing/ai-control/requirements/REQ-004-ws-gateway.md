@@ -1,5 +1,5 @@
 # REQ-004 WebSocket gateway
-Status: todo | Milestone: M1 | Depends: REQ-002, REQ-003
+Status: done | Milestone: M1 | Depends: REQ-002, REQ-003
 
 ## Goal
 Server endpoint that accepts computer connections, tracks them, and offers request/response calls to higher layers.
@@ -14,11 +14,11 @@ Server endpoint that accepts computer connections, tracks them, and offers reque
 - All client-reported errors are stored and forwarded.
 
 ## Acceptance criteria
-- [ ] Valid hello connects; invalid or missing hello is closed with a reason.
-- [ ] Duplicate connection for same computer replaces the old one.
-- [ ] `call()` times out cleanly and cleans pending state.
-- [ ] Offline detection via missed heartbeats updates DB status and emits an event.
-- [ ] Oversized or malformed frames do not crash the server.
+- [x] Valid hello connects; invalid or missing hello is closed with a reason.
+- [x] Duplicate connection for same computer replaces the old one.
+- [x] `call()` times out cleanly and cleans pending state.
+- [x] Offline detection via missed heartbeats updates DB status and emits an event.
+- [x] Oversized or malformed frames do not crash the server.
 
 ## Test plan
 pytest with a fake CC WebSocket client: connect, heartbeat, exec round trip, timeout, duplicate connect, bad auth.

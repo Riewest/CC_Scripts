@@ -19,6 +19,8 @@ pip install -e ".[dev]"
 
 From `vibing/ai-control`, copy `.env.example` to `.env`, then run `uvicorn aicontrol.main:app --app-dir server/src --reload --host 0.0.0.0 --port 8000`. The API health endpoint is at `http://localhost:8000/api/health`.
 
+The `.env.example` file documents all supported settings, including database and provider-key encryption configuration, the 128 KiB WebSocket frame limit, and hello/heartbeat timing limits.
+
 ## Run the frontend
 
 In another terminal, from `vibing/ai-control/web`, run `npm install` and `npm run dev`. Vite serves the UI and proxies `/api` and `/ws` to the backend. For the production UI, run `npm run build`; the backend serves `web/dist` automatically.

@@ -6,6 +6,8 @@ from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 
 from aicontrol.config import Settings, get_settings
+from aicontrol.gateway.registry import WebSocketGateway
+from aicontrol.gateway.router import router as gateway_router
 
 
 def _find_web_dist(settings: Settings) -> Path | None:
@@ -25,6 +27,8 @@ def _find_web_dist(settings: Settings) -> Path | None:
 def create_app(settings: Settings | None = None) -> FastAPI:
     app_settings = settings or get_settings()
     app = FastAPI(title="AI Control", debug=app_settings.environment == "development")
+    app.state.gateway = WebSocketGateway(app_settings)
+    app.include_router(gateway_router)
     web_dist = _find_web_dist(app_settings)
 
     @app.get("/api/health", tags=["health"])

@@ -48,7 +48,7 @@ vibing/ai-control/
 ### M1 MVP: basic computer control
 | ID | Title | Depends | Status |
 |---|---|---|---|
-| [REQ-004](requirements/REQ-004-ws-gateway.md) | WebSocket gateway | 002, 003 | todo |
+| [REQ-004](requirements/REQ-004-ws-gateway.md) | WebSocket gateway | 002, 003 | done |
 | [REQ-005](requirements/REQ-005-lua-client.md) | Lua client and installer | 003, 004 | todo |
 | [REQ-006](requirements/REQ-006-local-auth.md) | Local auth and sessions | 002 | todo |
 | [REQ-007](requirements/REQ-007-registration-flow.md) | Computer registration flow | 004, 005, 006 | todo |
