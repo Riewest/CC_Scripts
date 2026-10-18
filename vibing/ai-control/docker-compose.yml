@@ -12,6 +12,7 @@ services:
       AIC_HOST: ${AIC_HOST:-0.0.0.0}
       AIC_PORT: ${AIC_PORT:-8000}
       AIC_ENVIRONMENT: ${AIC_ENVIRONMENT:-development}
+      AIC_SECRET_ENCRYPTION_KEY: ${AIC_SECRET_ENCRYPTION_KEY:-}
 
 volumes:
   ai-control-data:

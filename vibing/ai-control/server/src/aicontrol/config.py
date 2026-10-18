@@ -13,6 +13,7 @@ class Settings(BaseSettings):
     database_url: str = "sqlite:///./aicontrol.db"
     environment: str = "development"
     web_dist_dir: Path | None = None
+    secret_encryption_key: str | None = None
 
     @field_validator("web_dist_dir", mode="before")
     @classmethod

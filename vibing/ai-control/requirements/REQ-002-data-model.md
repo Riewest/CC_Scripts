@@ -1,5 +1,5 @@
 # REQ-002 Data model and migrations
-Status: todo | Milestone: M0 | Depends: REQ-001
+Status: done | Milestone: M0 | Depends: REQ-001
 
 ## Goal
 SQLAlchemy 2 models and Alembic migrations for everything the plan needs, portable to Postgres.
@@ -10,11 +10,11 @@ Tables: `users` (username, password_hash nullable, role, oidc identities in `use
 Later REQs may add columns via new migrations; do not pre-build logic.
 
 ## Acceptance criteria
-- [ ] Models for all tables above exist with relationships and indexes on lookup columns.
-- [ ] Alembic initial migration applies cleanly to an empty SQLite DB and `alembic check` reports no drift.
-- [ ] Ownership constraint: a computer has exactly one of user/team owner (CHECK constraint).
-- [ ] Async session dependency for FastAPI plus a test fixture using an in-memory DB.
-- [ ] Secrets (passwords, device secrets, tokens) are stored hashed; provider keys are encrypted with a key from settings.
+- [x] Models for all tables above exist with relationships and indexes on lookup columns.
+- [x] Alembic initial migration applies cleanly to an empty SQLite DB and `alembic check` reports no drift.
+- [x] Ownership constraint: a computer has exactly one of user/team owner (CHECK constraint).
+- [x] Async session dependency for FastAPI plus a test fixture using an in-memory DB.
+- [x] Secrets (passwords, device secrets, tokens) are stored hashed; provider keys are encrypted with a key from settings.
 
 ## Test plan
 pytest: migration up/down, constraint violations, CRUD smoke tests per model.
