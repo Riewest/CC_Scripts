@@ -32,16 +32,17 @@ local function runCommand(packet)
             local success, result = pcall(func)
             if success then
                 log:debug("command executed successfully")
-                controller_ws:send({ type = "result", result = result }, PROTOCOLS.COMMAND_SUCCESS)
+                log:debug("result: %s", tostring(result))
+                controller_ws:send({ type = "result", result = result, command = packet.data }, PROTOCOLS.COMMAND_SUCCESS)
                 telemetry.setStatus(STATUSES.IDLE)
             else
                 log:error("command runtime error: %s", result)
-                controller_ws:send({ type = "error", error = result }, PROTOCOLS.COMMAND_ERROR)
+                controller_ws:send({ type = "error", error = result, command = packet.data }, PROTOCOLS.COMMAND_ERROR)
                 telemetry.setStatus(STATUSES.IDLE)
             end
         else
             log:error("command compile error: %s", err)
-            controller_ws:send({ type = "error", error = err }, PROTOCOLS.COMMAND_ERROR)
+            controller_ws:send({ type = "error", error = err, command = packet.data }, PROTOCOLS.COMMAND_ERROR)
             telemetry.setStatus(STATUSES.IDLE)
         end
 end

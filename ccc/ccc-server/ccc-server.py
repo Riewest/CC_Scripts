@@ -34,17 +34,16 @@ logger.addHandler(ch)
 connected_computers = {}
 event_loop = None
 
-def recieveTelemetry(computer:Computer, data:dict):
-    logger.info(f"Received telemetry from computer: {computer.computer_id}")
-    logger.debug(f"{data}")
-    computer.telemetry = data
-
 def processMessages(computer:Computer, message_raw:str):
     try:
         message = json.loads(message_raw)
         protocol = message.get("protocol")
         if protocol == Protocols.TELEMETRY:
-            recieveTelemetry(computer, message.get("data"))
+            computer.telemetry = message.get("data")
+        elif protocol == Protocols.COMMAND_SUCCESS:
+            computer.processLastCommand(message.get("data", {}))
+        elif protocol == Protocols.COMMAND_ERROR:
+            computer.processLastCommand(message.get("data", {}))
         else:
             logger.warning(f"Unknown protocol: {protocol}")
     except json.JSONDecodeError:
@@ -113,6 +112,7 @@ def serialize_computers():
                 "is_pocket": t.get("is_pocket"),
                 "status": computer.status,
                 "telemetry": t,
+                "last_command": computer.lastCommand,
             }
     return result
 

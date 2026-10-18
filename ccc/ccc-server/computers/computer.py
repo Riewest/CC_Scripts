@@ -21,12 +21,20 @@ class Computer:
         self.is_advanced = is_advanced
         self._status = None
         self.status = status
+        self._lastCommand = None
+
+    @property
+    def lastCommand(self):
+        return self._lastCommand
+    
+    @lastCommand.setter
+    def lastCommand(self, value):
+        self._lastCommand = value
 
 
     @property
     def status(self):
         return self._status
-
 
     @status.setter
     def status(self, value):
@@ -45,6 +53,8 @@ class Computer:
 
     @telemetry.setter
     def telemetry(self, data: dict):
+        logger.info(f"Received telemetry from computer: {self.computer_id}")
+        logger.debug(f"{data}")
         self._telemetry = data
         self.updateFromTelemetry()
 
@@ -55,6 +65,12 @@ class Computer:
         
         if "status" in self._telemetry:
             self.status = self._telemetry["status"]
+
+    
+    def processLastCommand(self, data: dict):
+        logger.info(f"Received success response from computer: {self.computer_id}")
+        logger.debug(f"{data}")
+        self.lastCommand = data
 
 
     async def send(self, message):
@@ -68,3 +84,5 @@ class Computer:
             "data": command
         }
         await self.send(json.dumps(message))
+
+    

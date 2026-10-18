@@ -73,6 +73,25 @@
     .badge-computer { background: #7c3aed22; color: #a78bfa; border: 1px solid #7c3aed55; }
     .badge-unknown  { background: #3f3f4622; color: #a1a1aa; border: 1px solid #3f3f4655; }
 
+    .result-block {
+      margin-top: 0.5rem;
+      font-family: monospace;
+      font-size: 0.78rem;
+      white-space: pre-wrap;
+      word-break: break-all;
+      padding: 0.4rem 0.6rem;
+      border-radius: 0.3rem;
+      background: #0f1117;
+      border: 1px solid #27272a;
+      color: #a1a1aa;
+    }
+
+    .result-block.error {
+      border-color: #7f1d1d55;
+      color: #f87171;
+      background: #7f1d1d11;
+    }
+
     .computer-id {
       font-size: 0.9rem;
       font-weight: 600;
@@ -382,6 +401,15 @@
 
     function renderCard(comp, channel) {
       const badge = getBadge(comp.is_turtle, comp.is_pocket);
+      const lc = comp.last_command;
+      const resultVal = lc != null && lc.result !== undefined ? lc.result : null;
+      const errorVal  = lc != null && lc.error  !== undefined ? lc.error  : null;
+      const resultHtml = resultVal != null
+        ? `<div class="result-block">${esc(typeof resultVal === "object" ? JSON.stringify(resultVal, null, 2) : resultVal)}</div>`
+        : `<em>No result yet.</em>`;
+      const errorHtml = errorVal != null
+        ? `<div class="result-block error">${esc(typeof errorVal === "object" ? JSON.stringify(errorVal, null, 2) : errorVal)}</div>`
+        : `<em>No errors yet.</em>`;
       return `
         <div class="card" data-channel="${esc(channel)}" data-cid="${esc(comp.id)}">
           <div class="card-header">
@@ -392,9 +420,17 @@
             <span class="computer-id-pill">ID ${esc(comp.id)}</span>
             ${comp.status ? `<span class="computer-status" style="${statusStyle(comp.status)}">${esc(comp.status)}</span>` : ""}
           </div>
-          <details data-cid="${esc(comp.id)}">
+          <details data-cid="${esc(comp.id)}" data-section="telemetry">
             <summary>Telemetry</summary>
             ${renderTelemetry(comp.telemetry)}
+          </details>
+          <details data-cid="${esc(comp.id)}" data-section="result">
+            <summary>Last Result</summary>
+            ${resultHtml}
+          </details>
+          <details data-cid="${esc(comp.id)}" data-section="error">
+            <summary>Last Error</summary>
+            ${errorHtml}
           </details>
         </div>`;
     }
@@ -415,8 +451,8 @@
       const channels = Object.entries(data);
 
       // Preserve which details panels are currently open
-      const openIds = new Set(
-        [...root.querySelectorAll("details[data-cid][open]")].map(el => el.dataset.cid)
+      const openSections = new Set(
+        [...root.querySelectorAll("details[data-cid][open]")].map(el => `${el.dataset.cid}:${el.dataset.section}`)
       );
 
       const filteredChannels = channels.map(([channel, computers]) => {
@@ -436,7 +472,7 @@
 
       // Restore open state
       root.querySelectorAll("details[data-cid]").forEach(el => {
-        if (openIds.has(el.dataset.cid)) el.open = true;
+        if (openSections.has(`${el.dataset.cid}:${el.dataset.section}`)) el.open = true;
       });
 
       // Restore selection
@@ -488,7 +524,7 @@
     document.getElementById("root").addEventListener("click", e => {
       const card = e.target.closest(".card");
       if (!card) return;
-      if (e.target.closest("details")) return; // don't intercept telemetry expand
+      if (e.target.closest("details")) return; // don't intercept details expand
       const channel = card.dataset.channel;
       const cid = card.dataset.cid;
       if (selectedChannel === channel && selectedCid === cid) {
