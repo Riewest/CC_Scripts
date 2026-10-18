@@ -41,7 +41,7 @@ vibing/ai-control/
 ### M0 Foundation
 | ID | Title | Depends | Status |
 |---|---|---|---|
-| [REQ-001](requirements/REQ-001-project-scaffold.md) | Project scaffold | - | todo |
+| [REQ-001](requirements/REQ-001-project-scaffold.md) | Project scaffold | - | done |
 | [REQ-002](requirements/REQ-002-data-model.md) | Data model and migrations | 001 | todo |
 | [REQ-003](requirements/REQ-003-wire-protocol.md) | Wire protocol spec | 001 | todo |
 

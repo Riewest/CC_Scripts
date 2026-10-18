@@ -1,0 +1,25 @@
+from functools import lru_cache
+from pathlib import Path
+
+from pydantic import field_validator
+from pydantic_settings import BaseSettings, SettingsConfigDict
+
+
+class Settings(BaseSettings):
+    model_config = SettingsConfigDict(env_prefix="AIC_", env_file=".env", extra="ignore")
+
+    host: str = "0.0.0.0"
+    port: int = 8000
+    database_url: str = "sqlite:///./aicontrol.db"
+    environment: str = "development"
+    web_dist_dir: Path | None = None
+
+    @field_validator("web_dist_dir", mode="before")
+    @classmethod
+    def empty_web_dist_dir_is_unset(cls, value: object) -> object:
+        return None if value == "" else value
+
+
+@lru_cache
+def get_settings() -> Settings:
+    return Settings()

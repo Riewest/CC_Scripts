@@ -1,5 +1,5 @@
 # REQ-001 Project scaffold
-Status: todo | Milestone: M0 | Depends: none
+Status: done | Milestone: M0 | Depends: none
 
 ## Goal
 A runnable, testable skeleton for server, web and client with Docker.
@@ -12,12 +12,12 @@ A runnable, testable skeleton for server, web and client with Docker.
 - Multi-stage Dockerfile (node build, python runtime).
 
 ## Acceptance criteria
-- [ ] `pytest` runs and passes with a health-check test.
-- [ ] `ruff check` is clean.
-- [ ] `npm run build` in `web/` succeeds and the server serves the built UI.
-- [ ] `docker compose up` starts the app and `/api/health` returns 200.
-- [ ] `.env.example` documents every setting.
-- [ ] README in `docs/` explains dev setup.
+- [x] `pytest` runs and passes with a health-check test.
+- [x] `ruff check` is clean.
+- [x] `npm run build` in `web/` succeeds and the server serves the built UI.
+- [x] `docker compose up` starts the app and `/api/health` returns 200.
+- [x] `.env.example` documents every setting.
+- [x] README in `docs/` explains dev setup.
 
 ## Test plan
 pytest: health endpoint, settings loading from env.

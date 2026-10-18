@@ -1,0 +1,17 @@
+services:
+  ai-control:
+    build: .
+    restart: unless-stopped
+    ports:
+      - "${AIC_PORT:-8000}:${AIC_PORT:-8000}"
+    volumes:
+      - ai-control-data:/app/data
+    environment:
+      AIC_DATABASE_URL: sqlite:////app/data/aicontrol.db
+      AIC_WEB_DIST_DIR: /app/server/src/aicontrol/static
+      AIC_HOST: ${AIC_HOST:-0.0.0.0}
+      AIC_PORT: ${AIC_PORT:-8000}
+      AIC_ENVIRONMENT: ${AIC_ENVIRONMENT:-development}
+
+volumes:
+  ai-control-data:
