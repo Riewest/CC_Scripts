@@ -1,7 +1,7 @@
 from functools import lru_cache
 from pathlib import Path
 
-from pydantic import field_validator
+from pydantic import Field, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -10,6 +10,7 @@ class Settings(BaseSettings):
 
     host: str = "0.0.0.0"
     port: int = 8000
+    max_ws_message_bytes: int = Field(default=131072, gt=0)
     database_url: str = "sqlite:///./aicontrol.db"
     environment: str = "development"
     web_dist_dir: Path | None = None

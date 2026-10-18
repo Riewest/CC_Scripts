@@ -1,5 +1,5 @@
 # REQ-003 Wire protocol spec
-Status: todo | Milestone: M0 | Depends: REQ-001
+Status: done | Milestone: M0 | Depends: REQ-001
 
 ## Goal
 A versioned JSON protocol between the Lua client and server, documented and implemented as Pydantic models.
@@ -13,10 +13,10 @@ A versioned JSON protocol between the Lua client and server, documented and impl
 - Auth on connect: device secret in `hello`, never in the URL query.
 
 ## Acceptance criteria
-- [ ] `docs/protocol.md` describes every message with examples and the chunking rules.
-- [ ] Pydantic models for all messages with a discriminated union and version field.
-- [ ] Unknown message types and bad payloads are rejected without crashing.
-- [ ] Chunk split/reassemble helpers with size limit setting.
+- [x] `docs/protocol.md` describes every message with examples and the chunking rules.
+- [x] Pydantic models for all messages with a discriminated union and version field.
+- [x] Unknown message types and bad payloads are rejected without crashing.
+- [x] Chunk split/reassemble helpers with size limit setting.
 
 ## Test plan
 pytest: round-trip each model, invalid payloads, chunk reassembly out-of-order and oversize.
