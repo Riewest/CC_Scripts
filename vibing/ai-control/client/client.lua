@@ -350,6 +350,16 @@ local function outputEnvironment(capture)
             local event = table.pack(coroutine.yield(EVENT_YIELD, filter))
             return table.unpack(event, 1, event.n)
         end
+        if environment.os.startTimer then
+            local function programSleep(seconds)
+                local timer = environment.os.startTimer(seconds or 0)
+                repeat
+                    local _, timerId = environment.os.pullEvent("timer")
+                until timerId == timer
+            end
+            environment.os.sleep = programSleep
+            environment.sleep = programSleep
+        end
     end
     return environment
 end
@@ -415,8 +425,18 @@ local function runProgram(message)
             os.pullEvent("aicontrol_program_tick")
             resumeArgs = {}
         elseif packedOrError == EVENT_YIELD then
-            local event = table.pack(os.pullEventRaw(yieldedFilter))
-            resumeArgs = { table.unpack(event, 1, event.n) }
+            while true do
+                local event = table.pack(os.pullEventRaw())
+                if interruptRequested then
+                    interrupted = true
+                    break
+                end
+                if not yieldedFilter or event[1] == yieldedFilter or event[1] == "terminate" then
+                    resumeArgs = { table.unpack(event, 1, event.n) }
+                    break
+                end
+            end
+            if interrupted then break end
         else
             programError = "Remote program yielded an unsupported value"
             programTraceback = debug.traceback(program, programError)
@@ -637,6 +657,7 @@ local function readerLoop()
                     local cancelledCount = emergency and cancelQueuedExecutions("Cancelled by emergency stop") or 0
                     if activeExecutionId then
                         interruptRequested = true
+                        os.queueEvent("aicontrol_interrupt")
                         pendingInterruptIds[#pendingInterruptIds + 1] = {
                             id = message.id,
                             emergency = emergency,
