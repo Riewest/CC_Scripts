@@ -238,3 +238,4 @@ class WebSocketGateway:
         self.settings = settings
         self.event_bus = EventBus()
         self.registry = ConnectionRegistry(settings, self.event_bus)
+        self.pairing_lock = asyncio.Lock()

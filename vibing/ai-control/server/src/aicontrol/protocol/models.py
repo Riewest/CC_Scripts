@@ -25,7 +25,7 @@ class DataModel(ProtocolModel):
 
 
 class HelloData(DataModel):
-    device_id: str = Field(min_length=1, max_length=128)
+    device_id: str = Field(min_length=1, max_length=36)
     secret: str = Field(min_length=1, max_length=512)
     kind: Literal["computer", "turtle", "pocket"]
     label: str = Field(min_length=1, max_length=120)
@@ -163,6 +163,7 @@ class PeripheralResultMessage(ProtocolModel):
 
 class HelloAckData(DataModel):
     accept: bool
+    device_secret: str | None = None
     session_id: str | None = None
     heartbeat_interval_s: int = Field(default=30, gt=0, le=3600)
     max_message_bytes: int = Field(default=131072, gt=0)

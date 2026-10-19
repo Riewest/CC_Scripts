@@ -19,7 +19,7 @@ pip install -e ".[dev]"
 
 From `vibing/ai-control`, copy `.env.example` to `.env`, then run `uvicorn aicontrol.main:app --app-dir server/src --reload --host 0.0.0.0 --port 8000`. The API health endpoint is at `http://localhost:8000/api/health`.
 
-The `.env.example` file documents all supported settings, including database and provider-key encryption configuration, the 128 KiB WebSocket frame limit, and hello/heartbeat timing limits.
+The `.env.example` file documents all supported settings, including database and provider-key encryption configuration, web/client distribution directories, the 128 KiB WebSocket frame limit, and hello/heartbeat timing limits.
 
 ## Run the frontend
 
@@ -31,4 +31,4 @@ From `vibing/ai-control/server`, run `pytest` and `ruff check .`.
 
 ## Docker Compose
 
-From `vibing/ai-control`, create `.env` from `.env.example`, then run `docker compose up --build`. Compose persists SQLite data in the `ai-control-data` volume and publishes the app on port 8000 by default. Confirm `http://localhost:8000/api/health` returns `{"status":"ok"}`.
+From `vibing/ai-control`, run `docker compose up --build -d`. The container applies Alembic migrations before starting the app, persists SQLite data in the `ai-control-data` volume, and publishes the app on port 8000 by default. Confirm `http://localhost:8000/api/health` returns `{"status":"ok"}`. Use `docker compose down` to stop it without deleting data; do not pass `-v` unless intentionally resetting the database.

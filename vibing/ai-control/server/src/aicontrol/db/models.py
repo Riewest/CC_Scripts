@@ -152,7 +152,10 @@ class Computer(TimestampMixin, Base):
 
 class PairingCode(TimestampMixin, Base):
     __tablename__ = "pairing_codes"
-    __table_args__ = (Index("ix_pairing_codes_expires_at", "expires_at"),)
+    __table_args__ = (
+        Index("ix_pairing_codes_code_hash", "code_hash", unique=True),
+        Index("ix_pairing_codes_expires_at", "expires_at"),
+    )
 
     id: Mapped[str] = mapped_column(String(36), primary_key=True, default=new_id)
     code_hash: Mapped[str] = mapped_column(String(255), nullable=False)

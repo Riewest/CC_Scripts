@@ -1,0 +1,87 @@
+local serverUrl = __SERVER_URL__
+local pairingCode = __PAIRING_CODE__
+local configDir = "/aicontrol"
+local configPath = configDir .. "/config"
+
+local function fail(message)
+    printError("AI Control install failed: " .. tostring(message))
+    return false
+end
+
+local function fetch(url)
+    local response, reason = http.get(url, nil, true)
+    if not response then
+        return nil, reason
+    end
+    local body = response.readAll()
+    response.close()
+    return body
+end
+
+local function writeFile(path, contents)
+    local parent = fs.getDir(path)
+    if parent ~= "" then fs.makeDir(parent) end
+    local handle = fs.open(path .. ".tmp", "w")
+    if not handle then return false, "cannot open " .. path end
+    handle.write(contents)
+    handle.close()
+    if fs.exists(path) then fs.delete(path) end
+    fs.move(path .. ".tmp", path)
+    return true
+end
+
+local function isSafeRelativePath(path)
+    if type(path) ~= "string" or path == "" or path:sub(1, 1) == "/" then return false end
+    if path:find("[^%w%._/%-]") then return false end
+    for segment in path:gmatch("[^/]+") do
+        if segment == "." or segment == ".." then return false end
+    end
+    return true
+end
+
+local function newDeviceId()
+    local computerId = os.getComputerID()
+    math.randomseed(os.epoch("utc") + computerId)
+    local randomHex = function(count)
+        local output = {}
+        for _ = 1, count do output[#output + 1] = string.format("%x", math.random(0, 15)) end
+        return table.concat(output)
+    end
+    return randomHex(8) .. "-" .. randomHex(4) .. "-4" .. randomHex(3) .. "-" ..
+        string.format("%x", math.random(8, 11)) .. randomHex(3) .. "-" .. randomHex(12)
+end
+
+print("Downloading AI Control client...")
+local manifestText, manifestError = fetch(serverUrl .. "/client/manifest.json")
+if not manifestText then return fail(manifestError) end
+local manifest = textutils.unserializeJSON(manifestText)
+if type(manifest) ~= "table" or type(manifest.files) ~= "table" then
+    return fail("invalid client manifest")
+end
+
+fs.makeDir(configDir)
+local config = {
+    server_url = serverUrl,
+    pairing_code = pairingCode,
+    device_id = newDeviceId(),
+    label = os.getComputerLabel() or ("Computer " .. tostring(os.getComputerID())),
+    kind = (turtle and "turtle") or (pocket and "pocket") or "computer",
+    client_version = manifest.version or "0.1.0",
+}
+
+for relativePath in pairs(manifest.files) do
+    if not isSafeRelativePath(relativePath) then return fail("unsafe path in client manifest") end
+    local contents, reason = fetch(serverUrl .. "/client/" .. relativePath)
+    if not contents then return fail(reason or ("cannot download " .. relativePath)) end
+    local target = relativePath == "startup.lua" and "/startup.lua" or (configDir .. "/" .. relativePath)
+    local ok, writeError = writeFile(target, contents)
+    if not ok then return fail(writeError) end
+end
+
+local configHandle = fs.open(configPath, "w")
+if not configHandle then return fail("cannot write device configuration") end
+configHandle.write(textutils.serializeJSON(config))
+configHandle.close()
+
+print("AI Control installed. Rebooting...")
+os.reboot()

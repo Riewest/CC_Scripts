@@ -18,9 +18,10 @@ class Settings(BaseSettings):
     environment: str = "development"
     allow_signup: bool = False
     web_dist_dir: Path | None = None
+    client_dist_dir: Path | None = None
     secret_encryption_key: str | None = None
 
-    @field_validator("web_dist_dir", mode="before")
+    @field_validator("web_dist_dir", "client_dist_dir", mode="before")
     @classmethod
     def empty_web_dist_dir_is_unset(cls, value: object) -> object:
         return None if value == "" else value

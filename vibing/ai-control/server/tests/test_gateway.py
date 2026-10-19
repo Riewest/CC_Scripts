@@ -80,6 +80,28 @@ def test_invalid_device_secret_is_closed_with_reason(gateway_context) -> None:
     assert "credentials" in closed.value.reason
 
 
+def test_pairing_code_issues_persistent_device_secret(gateway_context) -> None:
+    client, app, database_url, _ = gateway_context
+    device_id = "paired-device"
+    with FakeCC(client, device_id, "pairing-code") as cc:
+        ack = cc.receive_json()
+        assert ack["data"]["accept"] is True
+        device_secret = ack["data"]["device_secret"]
+        assert device_secret
+        cc.disconnect()
+        wait_for_unregistered(app, device_id)
+
+    with FakeCC(client, device_id, device_secret) as cc:
+        ack = cc.receive_json()
+        assert ack["data"]["accept"] is True
+        assert "device_secret" not in ack["data"]
+        cc.disconnect()
+        wait_for_unregistered(app, device_id)
+
+    status, _ = read_computer_status(database_url, device_id)
+    assert status == ComputerStatus.OFFLINE
+
+
 def test_missing_hello_is_closed_with_timeout(gateway_context) -> None:
     client, _, _, _ = gateway_context
     with client.websocket_connect("/ws/computer") as websocket:

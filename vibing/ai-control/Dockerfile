@@ -9,9 +9,12 @@ FROM python:3.12-slim AS runtime
 ENV PYTHONDONTWRITEBYTECODE=1 PYTHONUNBUFFERED=1
 WORKDIR /app
 COPY server/pyproject.toml ./server/pyproject.toml
+COPY server/alembic.ini ./server/alembic.ini
+COPY server/alembic ./server/alembic
 COPY server/src ./server/src
+COPY client/ ./server/src/aicontrol/client_dist/
 RUN pip install --no-cache-dir ./server
 COPY --from=web-build /build/web/dist ./server/src/aicontrol/static
-ENV AIC_WEB_DIST_DIR=/app/server/src/aicontrol/static
+ENV AIC_WEB_DIST_DIR=/app/server/src/aicontrol/static AIC_CLIENT_DIST_DIR=/app/server/src/aicontrol/client_dist
 EXPOSE 8000
-CMD ["python", "-m", "aicontrol.main"]
+CMD ["sh", "-c", "alembic -c /app/server/alembic.ini upgrade head && python -m aicontrol.main"]

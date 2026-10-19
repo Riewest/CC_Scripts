@@ -1,5 +1,6 @@
 import asyncio
 from collections.abc import AsyncIterator, Iterator
+from datetime import timedelta
 from pathlib import Path
 
 import pytest
@@ -9,8 +10,8 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_asyn
 from sqlalchemy.pool import NullPool, StaticPool
 
 from aicontrol.config import Settings
-from aicontrol.db.models import Base, Computer, ComputerKind, User
-from aicontrol.db.security import hash_secret
+from aicontrol.db.models import Base, Computer, ComputerKind, PairingCode, User, utc_now
+from aicontrol.db.security import hash_pairing_code, hash_secret
 from aicontrol.db.session import get_session
 from aicontrol.main import create_app
 
@@ -51,6 +52,13 @@ def gateway_context(tmp_path: Path) -> Iterator[tuple[TestClient, FastAPI, str, 
                     label="Gateway turtle",
                     kind=ComputerKind.COMPUTER,
                     device_secret_hash=hash_secret("correct-secret"),
+                )
+            )
+            session.add(
+                PairingCode(
+                    code_hash=hash_pairing_code("pairing-code"),
+                    owner_user_id=user.id,
+                    expires_at=utc_now() + timedelta(days=1),
                 )
             )
             await session.commit()

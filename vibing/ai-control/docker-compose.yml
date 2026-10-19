@@ -9,6 +9,7 @@ services:
     environment:
       AIC_DATABASE_URL: sqlite:////app/data/aicontrol.db
       AIC_WEB_DIST_DIR: /app/server/src/aicontrol/static
+      AIC_CLIENT_DIST_DIR: /app/server/src/aicontrol/client_dist
       AIC_HOST: ${AIC_HOST:-0.0.0.0}
       AIC_PORT: ${AIC_PORT:-8000}
       AIC_MAX_WS_MESSAGE_BYTES: ${AIC_MAX_WS_MESSAGE_BYTES:-131072}

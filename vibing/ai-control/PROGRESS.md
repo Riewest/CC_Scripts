@@ -41,5 +41,7 @@ Append-only. Newest entries at the bottom. Format: `YYYY-MM-DD | REQ-NNN | what 
 
 - 2026-10-18 | REQ-006 | Implemented atomic first-admin bootstrap, configurable signup, normalized usernames, Argon2id passwords with 12-character minimum, uniform failed-login responses, per-IP failure throttling, opaque random DB-backed session cookies with expiry/revocation, double-submit plus stored-hash CSRF checks, protected `/me`, password change/revoke-all, and same-origin cookie-authenticated `/ws/ui` | Browser sessions use the existing `api_tokens` table with a reserved `web-session:` label, random 256-bit tokens stored as SHA-256 digests, CSRF digests in labels, and 12-hour expiration. Session creation, query, logout, and invalidation are server-side, avoiding schema changes while the separate REQ-005 migration remains uncommitted | Next: all 8 auth tests pass within the 61-test suite and Ruff is clean; isolate and commit only REQ-006 hunks/files, leaving pending REQ-005 work uncommitted
 
+- 2026-10-18 | REQ-005 | User authorized committing the client/install/pairing/reconnect implementation with an explicit pending status while the UI-dependent run/output/traceback/interrupt checks await REQ-008 | Server suite passed 61 tests, Ruff passed, Lua sources parsed; REQ-005 remains blocked/pending and its commit message will say pending UI validation | Next: commit the isolated REQ-005 implementation as pending, then continue M1 with REQ-007 registration
+
 ## Ideas (out of scope, parked)
 - (none yet)

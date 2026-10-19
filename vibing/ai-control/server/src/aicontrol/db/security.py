@@ -1,3 +1,5 @@
+import hashlib
+
 from argon2 import PasswordHasher
 from argon2.exceptions import VerificationError, VerifyMismatchError
 from cryptography.fernet import Fernet, InvalidToken
@@ -23,6 +25,10 @@ def verify_secret(secret_hash: str, secret: str) -> bool:
         return _hasher.verify(secret_hash, secret)
     except (VerificationError, VerifyMismatchError):
         return False
+
+
+def hash_pairing_code(code: str) -> str:
+    return hashlib.sha256(code.encode("utf-8")).hexdigest()
 
 
 def encrypt_provider_key(api_key: str, encryption_key: str | None = None) -> str:

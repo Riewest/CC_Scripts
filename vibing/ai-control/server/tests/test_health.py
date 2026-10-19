@@ -17,12 +17,14 @@ def test_settings_load_from_environment(monkeypatch) -> None:
     monkeypatch.setenv("AIC_HOST", "127.0.0.1")
     monkeypatch.setenv("AIC_PORT", "8123")
     monkeypatch.setenv("AIC_ENVIRONMENT", "test")
+    monkeypatch.setenv("AIC_CLIENT_DIST_DIR", "")
 
     settings = Settings(_env_file=None)
 
     assert settings.host == "127.0.0.1"
     assert settings.port == 8123
     assert settings.environment == "test"
+    assert settings.client_dist_dir is None
 
 
 def test_spa_fallback_serves_built_ui(tmp_path) -> None:

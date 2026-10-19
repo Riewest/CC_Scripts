@@ -34,6 +34,8 @@ Example client hello:
 {"v":1,"type":"hello","id":"connect-17","data":{"device_id":"cc-42","secret":"<device-secret>","kind":"turtle","label":"Quarry 1","cc_version":"1.120.0","client_version":"0.1.0","capabilities":["terminal","filesystem","peripherals"]}}
 ```
 
+For initial pairing, `hello.data.secret` contains the one-time pairing code. The server consumes it, creates the computer record, and returns a generated `device_secret` in an accepted `hello_ack`; the client stores that secret and uses it for subsequent connections. The code and device secret are never sent in the URL.
+
 ## Server → client messages
 
 | Type | Data | Purpose |
