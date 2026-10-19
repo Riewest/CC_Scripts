@@ -2,12 +2,13 @@ from __future__ import annotations
 
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, HTTPException, Response, status
+from fastapi import APIRouter, Depends, HTTPException, Request, Response, status
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from aicontrol.audit import record_request
 from aicontrol.auth.sessions import SessionPrincipal, require_csrf
 from aicontrol.db.models import (
     Computer,
@@ -210,6 +211,7 @@ async def list_groups(
 @router.post("/api/groups", status_code=status.HTTP_201_CREATED)
 async def create_group(
     payload: GroupCreate,
+    request: Request,
     principal: Annotated[SessionPrincipal, Depends(require_csrf)],
     session: Annotated[AsyncSession, Depends(get_session)],
 ) -> dict[str, object]:
@@ -229,6 +231,8 @@ async def create_group(
         owner_team_id = payload.team_id
     group = ControlGroup(name=payload.name, owner_user_id=owner_user_id, owner_team_id=owner_team_id)
     session.add(group)
+    await session.flush()
+    await record_request(request, session, action="group.create", target_type="group", target_id=group.id, details={"name": group.name, "owner_team_id": group.owner_team_id}, commit=False)
     await session.commit()
     return _group_payload(group, [])
 
@@ -237,11 +241,13 @@ async def create_group(
 async def update_group(
     group_id: str,
     payload: GroupUpdate,
+    request: Request,
     principal: Annotated[SessionPrincipal, Depends(require_csrf)],
     session: Annotated[AsyncSession, Depends(get_session)],
 ) -> dict[str, object]:
     group = await _group_owner(session, group_id, principal.user)
     group.name = payload.name
+    await record_request(request, session, action="group.update", target_type="group", target_id=group.id, details={"name": group.name}, commit=False)
     await session.commit()
     computer_ids = await session.scalars(select(GroupMember.computer_id).where(GroupMember.group_id == group.id))
     return _group_payload(group, list(computer_ids))
@@ -250,11 +256,14 @@ async def update_group(
 @router.delete("/api/groups/{group_id}", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_group(
     group_id: str,
+    request: Request,
     principal: Annotated[SessionPrincipal, Depends(require_csrf)],
     session: Annotated[AsyncSession, Depends(get_session)],
 ) -> Response:
     group = await _group_owner(session, group_id, principal.user)
+    deleted_id = group.id
     await session.delete(group)
+    await record_request(request, session, action="group.delete", target_type="group", target_id=deleted_id, commit=False)
     await session.commit()
     return Response(status_code=status.HTTP_204_NO_CONTENT)
 
@@ -263,6 +272,7 @@ async def delete_group(
 async def add_group_computer(
     group_id: str,
     payload: GroupComputer,
+    request: Request,
     principal: Annotated[SessionPrincipal, Depends(require_csrf)],
     session: Annotated[AsyncSession, Depends(get_session)],
 ) -> dict[str, str]:
@@ -275,10 +285,13 @@ async def add_group_computer(
     member = GroupMember(group_id=group.id, computer_id=computer.id)
     session.add(member)
     try:
+        await session.flush()
+        await record_request(request, session, action="group.computer_add", target_type="group", target_id=group.id, computer_id=computer.id, details={"group_id": group.id}, commit=False)
         await session.commit()
     except IntegrityError:
         await session.rollback()
         raise HTTPException(status_code=409, detail="Computer is already in this group") from None
+    await record_request(request, session, action="group.computer_add", target_type="group", target_id=group.id, computer_id=computer.id, details={"group_id": group.id})
     return {"group_id": group.id, "computer_id": computer.id}
 
 
@@ -286,6 +299,7 @@ async def add_group_computer(
 async def remove_group_computer(
     group_id: str,
     computer_id: str,
+    request: Request,
     principal: Annotated[SessionPrincipal, Depends(require_csrf)],
     session: Annotated[AsyncSession, Depends(get_session)],
 ) -> Response:
@@ -296,6 +310,7 @@ async def remove_group_computer(
     if member is None:
         raise HTTPException(status_code=404, detail="Group computer not found")
     await session.delete(member)
+    await record_request(request, session, action="group.computer_remove", target_type="group", target_id=group_id, computer_id=computer_id, commit=False)
     await session.commit()
     return Response(status_code=status.HTTP_204_NO_CONTENT)
 
@@ -328,6 +343,7 @@ async def list_shares(
 @router.post("/api/shares", status_code=status.HTTP_201_CREATED)
 async def create_share(
     payload: ShareCreate,
+    request: Request,
     principal: Annotated[SessionPrincipal, Depends(require_csrf)],
     session: Annotated[AsyncSession, Depends(get_session)],
 ) -> dict[str, object]:
@@ -389,6 +405,14 @@ async def create_share(
         role=payload.role,
     )
     session.add(share)
+    await session.flush()
+    await record_request(
+        request, session, action="share.create", target_type="share", target_id=share.id,
+        computer_id=share.computer_id,
+        details={"subject_user_id": share.subject_user_id, "subject_team_id": share.subject_team_id,
+        "computer_id": share.computer_id, "group_id": share.group_id, "role": ShareRole(share.role).value},
+        commit=False,
+    )
     await session.commit()
     return _share_payload(share)
 
@@ -396,6 +420,7 @@ async def create_share(
 @router.delete("/api/shares/{share_id}", status_code=status.HTTP_204_NO_CONTENT)
 async def revoke_share(
     share_id: str,
+    request: Request,
     principal: Annotated[SessionPrincipal, Depends(require_csrf)],
     session: Annotated[AsyncSession, Depends(get_session)],
 ) -> Response:
@@ -435,7 +460,9 @@ async def revoke_share(
             )
         ):
             raise HTTPException(status_code=404, detail="Share not found")
+    details = {"computer_id": share.computer_id, "group_id": share.group_id, "role": ShareRole(share.role).value}
     await session.delete(share)
+    await record_request(request, session, action="share.revoke", target_type="share", target_id=share_id, computer_id=details["computer_id"], details=details, commit=False)
     await session.commit()
     return Response(status_code=status.HTTP_204_NO_CONTENT)
 

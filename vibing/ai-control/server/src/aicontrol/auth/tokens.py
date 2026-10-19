@@ -9,6 +9,7 @@ from pydantic import BaseModel, ConfigDict, Field, field_validator
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from aicontrol.audit import record_request
 from aicontrol.auth.sessions import (
     API_TOKEN_LABEL_PREFIX,
     API_TOKEN_SCOPES,
@@ -153,6 +154,12 @@ async def create_token(
         expires_at=payload.expires_at.astimezone(UTC) if payload.expires_at else None,
     )
     session.add(record)
+    await record_request(
+        request, session, action="api_token.create", target_type="api_token",
+        target_id=record.id, details={"label": payload.label, "scopes": payload.scopes,
+        "computer_ids": payload.computer_ids, "group_ids": payload.group_ids,
+        "expires_at": record.expires_at.isoformat() if record.expires_at else None}, commit=False,
+    )
     await session.commit()
     return {**_payload(record), "token": plaintext}
 
@@ -176,6 +183,7 @@ async def list_tokens(
 @router.delete("/{token_id}", status_code=status.HTTP_204_NO_CONTENT)
 async def revoke_token(
     token_id: str,
+    request: Request,
     principal: Annotated[SessionPrincipal, Depends(require_csrf)],
     session: Annotated[AsyncSession, Depends(get_session)],
 ) -> Response:
@@ -188,6 +196,11 @@ async def revoke_token(
     )
     if record is None:
         raise HTTPException(status_code=404, detail="API token not found")
+    revoked_id = record.id
     await session.delete(record)
+    await record_request(
+        request, session, action="api_token.revoke", target_type="api_token", target_id=revoked_id,
+        details={"revoked_token_prefix": record.token_prefix}, commit=False,
+    )
     await session.commit()
     return Response(status_code=status.HTTP_204_NO_CONTENT)

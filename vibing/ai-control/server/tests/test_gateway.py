@@ -481,7 +481,7 @@ def test_client_errors_are_persisted_and_forwarded(gateway_context) -> None:
         engine = create_async_engine(database_url)
         factory = async_sessionmaker(engine, expire_on_commit=False)
         async with factory() as session:
-            audit = await session.scalar(select(AuditEvent).where(AuditEvent.action == "client_error"))
+            audit = await session.scalar(select(AuditEvent).where(AuditEvent.action == "client.error"))
             assert audit is not None
             assert audit.details["message"] == "script failed"
         await engine.dispose()

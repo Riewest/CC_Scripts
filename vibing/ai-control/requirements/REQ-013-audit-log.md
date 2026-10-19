@@ -1,5 +1,5 @@
 # REQ-013 Audit log
-Status: todo | Milestone: M2 | Depends: REQ-008
+Status: done | Milestone: M2 | Depends: REQ-008
 
 ## Goal
 Immutable record of every command, script, AI action and result, with viewer UI.
@@ -13,10 +13,10 @@ Immutable record of every command, script, AI action and result, with viewer UI.
 - Visibility: owners and admins see all for their computers; operators see their own.
 
 ## Acceptance criteria
-- [ ] All actions listed above produce events.
-- [ ] Secrets are redacted.
-- [ ] No API can modify or delete events except retention pruning by admin.
-- [ ] Filtering, pagination and export work.
+- [x] All currently implemented control-plane actions in scope produce events through the unified audit writer; unimplemented future file/peripheral/AI actions will use this same hook when those features are introduced.
+- [x] Secrets (passwords, OIDC flow values, API/device/pairing tokens, authorization/cookie/CSRF values) are redacted before persistence; tests cover nested and inline secrets.
+- [x] Audit events are ORM append-only; no edit/delete API exists. Explicit retention pruning is administrator-only, requires a cutoff at least one day old, and itself emits an event.
+- [x] Visibility, filters (computer, actor user/token/type, action, outcome, time), pagination, JSON/CSV export work; CSV formula cells are neutralized.
 
 ## Test plan
 pytest: event creation per action, redaction, visibility rules, pagination.

@@ -7,6 +7,7 @@ from fastapi import APIRouter, Depends, HTTPException, Request, status
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from aicontrol.audit import record_request
 from aicontrol.auth.sessions import SessionPrincipal, current_session, require_csrf
 from aicontrol.db.models import Computer, PairingCode, Team, TeamMember, utc_now
 from aicontrol.db.security import hash_pairing_code
@@ -79,7 +80,7 @@ async def _insert_code(
         expires_at=utc_now() + PAIRING_LIFETIME,
     )
     session.add(pairing)
-    await session.commit()
+    await session.flush()
     await session.refresh(pairing)
     return pairing, plaintext
 
@@ -121,6 +122,11 @@ async def create_pairing_code(
         target_computer_id=None,
         label=payload.label,
     )
+    await record_request(
+        request, session, action="pairing.create", target_type="pairing_code", target_id=pairing.id,
+        details={"owner_team_id": owner_team_id, "label": payload.label}, commit=False,
+    )
+    await session.commit()
     return _response(pairing, plaintext, request)
 
 
@@ -154,6 +160,11 @@ async def create_repair_code(
         target_computer_id=computer.id,
         label=None,
     )
+    await record_request(
+        request, session, action="pairing.repair_create", target_type="pairing_code",
+        target_id=pairing.id, computer_id=computer.id, commit=False,
+    )
+    await session.commit()
     return _response(pairing, plaintext, request)
 
 

@@ -7,6 +7,7 @@ from pydantic import BaseModel
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from aicontrol.audit import record_request
 from aicontrol.auth.sessions import (
     SessionPrincipal,
     authorize_api_request,
@@ -57,6 +58,7 @@ async def list_users(
 async def update_user(
     user_id: str,
     payload: UserUpdate,
+    request: Request,
     principal: Annotated[SessionPrincipal, Depends(require_csrf)],
     _: Annotated[User, Depends(admin_user)],
     session: Annotated[AsyncSession, Depends(get_session)],
@@ -89,6 +91,10 @@ async def update_user(
         records = await session.scalars(select(ApiToken).where(ApiToken.user_id == target.id))
         for record in records:
             await session.delete(record)
+    await record_request(
+        request, session, action="admin.user_update", target_type="user", target_id=target.id,
+        details={"role": target.role.value, "disabled": target.disabled}, commit=False,
+    )
     await session.commit()
     return {
         "id": target.id,

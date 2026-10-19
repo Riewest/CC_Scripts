@@ -19,6 +19,7 @@ from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from aicontrol.audit import record
 from aicontrol.auth.sessions import (
     SESSION_COOKIE,
     SessionPrincipal,
@@ -292,6 +293,14 @@ async def callback(
         if not _domain_allowed(claims, provider):
             raise ValueError("Email domain is not permitted")
     except (httpx.HTTPError, JoseError, ValueError, KeyError, TypeError):
+        await record(
+            session,
+            action="auth.oidc_login" if flow.link_user_id is None else "auth.oidc_identity_link",
+            actor_user_id=flow.link_user_id,
+            outcome="failure",
+            source_ip=request.client.host if request.client else None,
+            details={"provider": provider.name, "reason": "verification_failed"},
+        )
         raise HTTPException(status_code=401, detail="OIDC sign-in could not be verified") from None
 
     identity = await session.scalar(
@@ -314,6 +323,17 @@ async def callback(
             )
         )
         try:
+            await session.flush()
+            await record(
+                session,
+                action="auth.oidc_identity_link",
+                actor_user_id=flow.link_user_id,
+                target_type="identity",
+                target_id=claims["sub"],
+                source_ip=request.client.host if request.client else None,
+                details={"provider": provider.name},
+                commit=False,
+            )
             await session.commit()
         except IntegrityError:
             await session.rollback()
@@ -349,6 +369,15 @@ async def callback(
                 raise HTTPException(status_code=401, detail="OIDC sign-in could not be verified") from None
 
     session_token, csrf_token = await create_browser_session(user, session)
+    await record(
+        session,
+        action="auth.oidc_login",
+        actor_user_id=user.id,
+        target_type="user",
+        target_id=user.id,
+        source_ip=request.client.host if request.client else None,
+        details={"provider": provider.name},
+    )
     authenticated = RedirectResponse("/", status_code=303)
     set_auth_cookies(
         authenticated,

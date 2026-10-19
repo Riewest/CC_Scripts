@@ -6,8 +6,9 @@ from typing import Any
 from fastapi import WebSocket
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from aicontrol.audit import record
 from aicontrol.config import Settings
-from aicontrol.db.models import AuditEvent, Computer
+from aicontrol.db.models import Computer
 from aicontrol.protocol.models import (
     ChunkMessage,
     ErrorMessage,
@@ -172,18 +173,21 @@ class GatewayConnection:
                 "message": message.data.message,
                 "details": message.data.details,
             }
-            session.add(
-                AuditEvent(
-                    action="client_error",
-                    target_type="computer",
-                    target_id=self.computer_id,
-                    details=error_details,
-                )
+            await record(
+                session,
+                action="client.error",
+                actor_type="system",
+                computer_id=self.computer_id,
+                target_type="computer",
+                target_id=self.computer_id,
+                outcome="failure",
+                details=error_details,
+                commit=False,
             )
-            await session.commit()
             await event_bus.publish(
                 GatewayEvent("error", self.computer_id, message, error_details)
             )
+            await session.commit()
         elif event_name:
             if isinstance(message, TelemetryMessage):
                 computer = await session.get(Computer, self.computer_id)

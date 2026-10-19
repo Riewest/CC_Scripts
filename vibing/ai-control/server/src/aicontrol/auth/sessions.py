@@ -102,7 +102,18 @@ async def lookup_api_token(
         return None
     record.last_used_at = utc_now()
     record.last_used_ip = remote_ip
-    await session.commit()
+    from aicontrol.audit import record as record_audit
+
+    await record_audit(
+        session,
+        action="api_token.use",
+        actor_user_id=user.id,
+        actor_token_id=record.id,
+        actor_type="token",
+        source_ip=remote_ip,
+        details={"token_prefix": record.token_prefix, "scopes": record.scopes or []},
+        commit=True,
+    )
     return SessionPrincipal(user, record, is_api_token=True)
 
 
@@ -124,6 +135,7 @@ async def current_session(
     principal = await lookup_session(request.cookies.get(SESSION_COOKIE), session)
     if principal is None:
         raise HTTPException(status_code=401, detail="Authentication required")
+    request.state.principal = principal
     return principal
 
 
@@ -164,6 +176,7 @@ async def require_csrf(
         or not secrets.compare_digest(token_digest(csrf_cookie), stored_digest)
     ):
         raise HTTPException(status_code=403, detail="CSRF validation failed")
+    request.state.principal = principal
     return principal
 
 

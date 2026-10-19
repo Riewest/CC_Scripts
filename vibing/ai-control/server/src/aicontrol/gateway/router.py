@@ -9,6 +9,7 @@ from fastapi import APIRouter, Depends, WebSocket, WebSocketDisconnect
 from sqlalchemy import select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from aicontrol.audit import record
 from aicontrol.db.models import (
     Computer,
     ComputerKind,
@@ -171,6 +172,16 @@ async def _authenticate_or_pair(
             update(PairingCode)
             .where(PairingCode.id == pairing_candidate.id)
             .values(paired_computer_id=computer.id)
+        )
+        await record(
+            session,
+            action="pairing.accept",
+            actor_type="system",
+            computer_id=computer.id,
+            target_type="computer",
+            target_id=computer.id,
+            details={"repaired": target_computer_id is not None},
+            commit=False,
         )
         await session.commit()
         pairing_exchange_limiter.clear(peer_key)

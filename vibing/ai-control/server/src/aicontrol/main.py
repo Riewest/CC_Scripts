@@ -6,6 +6,7 @@ from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 
 from aicontrol.api.computers import router as computers_router
+from aicontrol.audit_routes import router as audit_router
 from aicontrol.auth.admin import router as admin_router
 from aicontrol.auth.oidc import router as oidc_router
 from aicontrol.auth.routes import router as auth_router
@@ -38,12 +39,14 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app_settings = settings or get_settings()
     app = FastAPI(title="AI Control", debug=app_settings.environment == "development")
     app.state.gateway = WebSocketGateway(app_settings)
+    app.state.settings = app_settings
     app.include_router(gateway_router)
     app.include_router(auth_router)
     app.include_router(oidc_router)
     app.include_router(tokens_router)
     app.include_router(teams_router)
     app.include_router(sharing_router)
+    app.include_router(audit_router)
     app.include_router(admin_router)
     app.include_router(auth_websocket_router)
     app.include_router(client_router)
@@ -79,7 +82,6 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             return FileResponse(requested_file)
         return FileResponse(root / "index.html")
 
-    app.state.settings = app_settings
     return app
 
 

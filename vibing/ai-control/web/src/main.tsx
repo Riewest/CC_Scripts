@@ -7,6 +7,7 @@ import { Dashboard } from './pages/Dashboard'
 import { Tokens } from './pages/Tokens'
 import { Teams } from './pages/Teams'
 import { Groups } from './pages/Groups'
+import { Audit } from './pages/Audit'
 import './style.css'
 
 function App() {
@@ -16,6 +17,8 @@ function App() {
   const [showTokens, setShowTokens] = useState(false)
   const [showTeams, setShowTeams] = useState(false)
   const [showGroups, setShowGroups] = useState(false)
+  const [showAudit, setShowAudit] = useState(false)
+  const [auditComputerId, setAuditComputerId] = useState<string | null>(null)
   const [isAdmin, setIsAdmin] = useState(false)
   const [repairTarget, setRepairTarget] = useState<{ id: string; label: string } | null>(null)
   const handleLogout = useCallback(() => setAuthState('signed-out'), [])
@@ -48,8 +51,9 @@ function App() {
   if (showTokens) return <main className="shell"><Tokens onBack={() => setShowTokens(false)} isAdmin={isAdmin} /></main>
   if (showTeams) return <main className="shell"><Teams onBack={() => setShowTeams(false)} /></main>
   if (showGroups) return <main className="shell"><Groups onBack={() => setShowGroups(false)} /></main>
+  if (showAudit || auditComputerId) return <main className="shell"><Audit computerId={auditComputerId ?? undefined} onBack={() => { setShowAudit(false); setAuditComputerId(null) }} /></main>
   if (showAddComputer || repairTarget) return <main className="shell"><AddComputer onBack={() => { setShowAddComputer(false); setRepairTarget(null) }} repairComputerId={repairTarget?.id} repairLabel={repairTarget?.label} /></main>
-  return <main className="shell"><Dashboard onAddComputer={handleAddComputer} onRepairComputer={(computer) => setRepairTarget(computer)} onLogout={handleLogout} onAdmin={() => setShowAdmin(true)} onTokens={() => setShowTokens(true)} onTeams={() => setShowTeams(true)} onGroups={() => setShowGroups(true)} isAdmin={isAdmin} /></main>
+  return <main className="shell"><Dashboard onAddComputer={handleAddComputer} onRepairComputer={(computer) => setRepairTarget(computer)} onLogout={handleLogout} onAdmin={() => setShowAdmin(true)} onTokens={() => setShowTokens(true)} onTeams={() => setShowTeams(true)} onGroups={() => setShowGroups(true)} onAudit={() => setShowAudit(true)} onComputerAudit={(id) => setAuditComputerId(id)} isAdmin={isAdmin} /></main>
 }
 
 ReactDOM.createRoot(document.getElementById('root')!).render(

@@ -17,6 +17,7 @@ from sqlalchemy import (
     String,
     Text,
     UniqueConstraint,
+    event,
 )
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
 
@@ -310,15 +311,40 @@ class ApiToken(TimestampMixin, Base):
 
 class AuditEvent(TimestampMixin, Base):
     __tablename__ = "audit_events"
-    __table_args__ = (Index("ix_audit_events_actor_user_id", "actor_user_id"), Index("ix_audit_events_created_at", "created_at"))
+    __table_args__ = (
+        Index("ix_audit_events_actor_user_id", "actor_user_id"),
+        Index("ix_audit_events_created_at", "created_at"),
+        Index("ix_audit_events_computer_created", "computer_id", "created_at"),
+        Index("ix_audit_events_action", "action"),
+    )
 
     id: Mapped[str] = mapped_column(String(36), primary_key=True, default=new_id)
     actor_user_id: Mapped[str | None] = mapped_column(ForeignKey("users.id", ondelete="SET NULL"))
+    actor_token_id: Mapped[str | None] = mapped_column(ForeignKey("api_tokens.id", ondelete="SET NULL"))
+    actor_type: Mapped[str] = mapped_column(String(24), default="user", nullable=False)
+    computer_id: Mapped[str | None] = mapped_column(ForeignKey("computers.id", ondelete="SET NULL"))
     action: Mapped[str] = mapped_column(String(120), nullable=False)
     target_type: Mapped[str | None] = mapped_column(String(80))
     target_id: Mapped[str | None] = mapped_column(String(36))
+    outcome: Mapped[str] = mapped_column(String(24), default="success", nullable=False)
+    source_ip: Mapped[str | None] = mapped_column(String(64))
     details: Mapped[dict[str, Any] | None] = mapped_column(JSON)
     actor: Mapped[User | None] = relationship()
+    actor_token: Mapped[ApiToken | None] = relationship()
+
+    @property
+    def event_time(self) -> datetime:
+        return self.created_at
+
+
+@event.listens_for(AuditEvent, "before_update")
+def _audit_events_are_immutable(_mapper, _connection, _target) -> None:
+    raise ValueError("Audit events are append-only")
+
+
+@event.listens_for(AuditEvent, "before_delete")
+def _audit_events_require_bulk_retention_pruning(_mapper, _connection, _target) -> None:
+    raise ValueError("Audit events may only be removed by the admin retention operation")
 
 
 class ExecRun(Base):

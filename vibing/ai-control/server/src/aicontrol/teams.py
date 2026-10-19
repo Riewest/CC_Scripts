@@ -5,12 +5,13 @@ import secrets
 from datetime import timedelta
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, HTTPException, Response, status
+from fastapi import APIRouter, Depends, HTTPException, Request, Response, status
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 from sqlalchemy import func, or_, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from aicontrol.audit import record_request
 from aicontrol.auth.sessions import SessionPrincipal, require_csrf, token_digest
 from aicontrol.db.models import (
     Computer,
@@ -150,6 +151,7 @@ async def list_members(
 @router.post("", status_code=status.HTTP_201_CREATED)
 async def create_team(
     payload: TeamCreate,
+    request: Request,
     principal: Annotated[SessionPrincipal, Depends(require_csrf)],
     session: Annotated[AsyncSession, Depends(get_session)],
 ) -> dict[str, object]:
@@ -159,6 +161,8 @@ async def create_team(
     await session.flush()
     membership = TeamMember(team_id=team.id, user_id=principal.user.id, role=TeamRole.OWNER)
     session.add(membership)
+    await session.flush()
+    await record_request(request, session, action="team.create", target_type="team", target_id=team.id, details={"name": team.name, "default_member_role": team.default_member_role.value}, commit=False)
     await session.commit()
     await session.refresh(team, attribute_names=["memberships"])
     return _team_payload(team, membership)
@@ -168,12 +172,14 @@ async def create_team(
 async def update_team(
     team_id: str,
     payload: TeamRoleUpdate,
+    request: Request,
     principal: Annotated[SessionPrincipal, Depends(require_csrf)],
     session: Annotated[AsyncSession, Depends(get_session)],
 ) -> dict[str, object]:
     team, membership = await _membership(session, team_id, principal.user.id)
     _require_owner(membership)
     team.default_member_role = payload.default_member_role
+    await record_request(request, session, action="team.update", target_type="team", target_id=team.id, details={"default_member_role": team.default_member_role.value}, commit=False)
     await session.commit()
     await session.refresh(team, attribute_names=["memberships"])
     return _team_payload(team, membership)
@@ -183,6 +189,7 @@ async def update_team(
 async def delete_team(
     team_id: str,
     payload: TeamDeleteConfirm,
+    request: Request,
     principal: Annotated[SessionPrincipal, Depends(require_csrf)],
     session: Annotated[AsyncSession, Depends(get_session)],
 ) -> Response:
@@ -194,6 +201,7 @@ async def delete_team(
     if list(computers):
         raise HTTPException(status_code=409, detail="Transfer or remove team computers before deleting the team")
     await session.delete(team)
+    await record_request(request, session, action="team.delete", target_type="team", target_id=team_id, commit=False)
     await session.commit()
     return Response(status_code=status.HTTP_204_NO_CONTENT)
 
@@ -202,6 +210,7 @@ async def delete_team(
 async def create_invite(
     team_id: str,
     payload: InviteCreate,
+    request: Request,
     principal: Annotated[SessionPrincipal, Depends(require_csrf)],
     session: Annotated[AsyncSession, Depends(get_session)],
 ) -> dict[str, object]:
@@ -222,6 +231,8 @@ async def create_invite(
         expires_at=utc_now() + INVITE_LIFETIME,
     )
     session.add(invite)
+    await session.flush()
+    await record_request(request, session, action="team.invite_create", target_type="team", target_id=team_id, details={"invited_username": invite.username, "invite_id": invite.id}, commit=False)
     await session.commit()
     return {"id": invite.id, "team_id": team_id, "username": invite.username, "expires_at": invite.expires_at.isoformat(), "invite_token": token}
 
@@ -249,6 +260,7 @@ async def list_my_invites(
 @router.post("/invites/{invite_token}/accept", status_code=status.HTTP_201_CREATED)
 async def accept_invite(
     invite_token: str,
+    request: Request,
     principal: Annotated[SessionPrincipal, Depends(require_csrf)],
     session: Annotated[AsyncSession, Depends(get_session)],
 ) -> dict[str, object]:
@@ -265,6 +277,8 @@ async def accept_invite(
     invite.accepted_at = utc_now()
     session.add(membership)
     try:
+        await session.flush()
+        await record_request(request, session, action="team.invite_accept", target_type="team", target_id=invite.team_id, details={"invite_id": invite.id}, commit=False)
         await session.commit()
     except IntegrityError:
         await session.rollback()
@@ -278,6 +292,7 @@ async def accept_invite(
 async def remove_member(
     team_id: str,
     user_id: str,
+    request: Request,
     principal: Annotated[SessionPrincipal, Depends(require_csrf)],
     session: Annotated[AsyncSession, Depends(get_session)],
 ) -> Response:
@@ -298,6 +313,7 @@ async def remove_member(
         if owner_count < 2:
             raise HTTPException(status_code=409, detail="Transfer ownership before removing the last owner")
     await session.delete(target)
+    await record_request(request, session, action="team.member_remove", target_type="team", target_id=team_id, details={"removed_user_id": user_id}, commit=False)
     await session.commit()
     return Response(status_code=status.HTTP_204_NO_CONTENT)
 
@@ -306,15 +322,17 @@ async def remove_member(
 async def remove_member_by_body(
     team_id: str,
     payload: MemberRemove,
+    request: Request,
     principal: Annotated[SessionPrincipal, Depends(require_csrf)],
     session: Annotated[AsyncSession, Depends(get_session)],
 ) -> Response:
-    return await remove_member(team_id, payload.user_id, principal, session)
+    return await remove_member(team_id, payload.user_id, request, principal, session)
 
 
 @router.post("/{team_id}/leave", status_code=status.HTTP_204_NO_CONTENT)
 async def leave_team(
     team_id: str,
+    request: Request,
     principal: Annotated[SessionPrincipal, Depends(require_csrf)],
     session: Annotated[AsyncSession, Depends(get_session)],
 ) -> Response:
@@ -324,6 +342,7 @@ async def leave_team(
         if others is None:
             raise HTTPException(status_code=409, detail="Transfer ownership before leaving as the last owner")
     await session.delete(membership)
+    await record_request(request, session, action="team.leave", target_type="team", target_id=team_id, commit=False)
     await session.commit()
     return Response(status_code=status.HTTP_204_NO_CONTENT)
 
@@ -332,6 +351,7 @@ async def leave_team(
 async def transfer_ownership(
     team_id: str,
     payload: TransferRequest,
+    request: Request,
     principal: Annotated[SessionPrincipal, Depends(require_csrf)],
     session: Annotated[AsyncSession, Depends(get_session)],
 ) -> dict[str, object]:
@@ -342,6 +362,7 @@ async def transfer_ownership(
         raise HTTPException(status_code=404, detail="Team member not found")
     current.role = TeamRole.MEMBER
     target.role = TeamRole.OWNER
+    await record_request(request, session, action="team.transfer_ownership", target_type="team", target_id=team_id, details={"new_owner_user_id": target.user_id}, commit=False)
     await session.commit()
     return {"team_id": team_id, "owner_user_id": target.user_id}
 
@@ -350,6 +371,7 @@ async def transfer_ownership(
 async def transfer_personal_computer_to_team(
     team_id: str,
     computer_id: str,
+    request: Request,
     principal: Annotated[SessionPrincipal, Depends(require_csrf)],
     session: Annotated[AsyncSession, Depends(get_session)],
 ) -> dict[str, str]:
@@ -361,5 +383,6 @@ async def transfer_personal_computer_to_team(
         raise HTTPException(status_code=409, detail="Computer must be offline before ownership transfer")
     computer.owner_user_id = None
     computer.owner_team_id = team.id
+    await record_request(request, session, action="computer.transfer_to_team", target_type="computer", target_id=computer.id, computer_id=computer.id, details={"owner_team_id": team.id}, commit=False)
     await session.commit()
     return {"id": computer.id, "owner_team_id": team.id}

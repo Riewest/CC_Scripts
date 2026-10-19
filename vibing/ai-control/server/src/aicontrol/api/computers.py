@@ -5,6 +5,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from aicontrol.api.computer_schemas import ExecRequest, InterruptRequest, RenameComputerRequest
+from aicontrol.audit import record_request
 from aicontrol.auth.sessions import SessionPrincipal, require_api_access
 from aicontrol.db.models import Computer, ComputerStatus, ExecRun, User, new_id, utc_now
 from aicontrol.db.session import get_session
@@ -110,11 +111,18 @@ async def get_computer(
 async def rename_computer(
     computer_id: str,
     payload: RenameComputerRequest,
+    request: Request,
     principal: Annotated[SessionPrincipal, Depends(require_api_access("computers:exec"))],
     session: Annotated[AsyncSession, Depends(get_session)],
 ) -> dict[str, Any]:
     computer = await _owned_computer(computer_id, principal.user, session)
     computer.label = payload.label
+    await session.commit()
+    await record_request(
+        request, session, action="computer.rename", target_type="computer",
+        target_id=computer.id, computer_id=computer.id, details={"label": payload.label},
+        commit=False,
+    )
     await session.commit()
     return _computer_payload(computer)
 
@@ -139,6 +147,7 @@ async def list_runs(
 async def execute_code(
     computer_id: str,
     payload: ExecRequest,
+    request: Request,
     principal: Annotated[SessionPrincipal, Depends(require_api_access("computers:exec"))],
     session: Annotated[AsyncSession, Depends(get_session)],
     gateway: Annotated[WebSocketGateway, Depends(current_gateway)],
@@ -156,7 +165,7 @@ async def execute_code(
     )
     session.add(run)
     await session.commit()
-    request = ExecMessage(
+    exec_message = ExecMessage(
         type="exec",
         id=run.id,
         data={"name": payload.name, "code": payload.code, "timeout_ms": payload.timeout_ms},
@@ -164,7 +173,7 @@ async def execute_code(
     try:
         reply = await gateway.registry.call(
             computer_id,
-            request,
+            exec_message,
             timeout=payload.timeout_ms / 1000 + 10,
         )
     except TimeoutError:
@@ -192,6 +201,18 @@ async def execute_code(
     run.finished_at = utc_now()
     run.result = result
     await session.commit()
+    await record_request(
+        request,
+        session,
+        action="computer.exec",
+        target_type="run",
+        target_id=run.id,
+        computer_id=computer.id,
+        outcome="success" if result.get("ok") else "failure",
+        details={"name": payload.name, "code": payload.code, "result": result},
+        commit=False,
+    )
+    await session.commit()
     await gateway.event_bus.publish(
         GatewayEvent("exec_result", computer_id, details={"run_id": run.id, "result": result})
     )
@@ -201,6 +222,7 @@ async def execute_code(
 @router.post("/{computer_id}/interrupt", status_code=status.HTTP_202_ACCEPTED)
 async def interrupt_program(
     computer_id: str,
+    request: Request,
     principal: Annotated[SessionPrincipal, Depends(require_api_access("computers:exec"))],
     session: Annotated[AsyncSession, Depends(get_session)],
     gateway: Annotated[WebSocketGateway, Depends(current_gateway)],
@@ -218,12 +240,18 @@ async def interrupt_program(
         )
     except ConnectionError as exc:
         raise HTTPException(status_code=409, detail="Computer is offline") from exc
+    await record_request(
+        request, session, action="computer.interrupt", target_type="computer",
+        target_id=computer_id, computer_id=computer_id,
+        details={"emergency": bool(payload and payload.emergency)},
+    )
     return {"status": "interrupt_sent"}
 
 
 @router.post("/{computer_id}/emergency-stop", status_code=status.HTTP_202_ACCEPTED)
 async def emergency_stop(
     computer_id: str,
+    request: Request,
     principal: Annotated[SessionPrincipal, Depends(require_api_access("computers:exec"))],
     session: Annotated[AsyncSession, Depends(get_session)],
     gateway: Annotated[WebSocketGateway, Depends(current_gateway)],
@@ -240,12 +268,17 @@ async def emergency_stop(
         )
     except ConnectionError as exc:
         raise HTTPException(status_code=409, detail="Computer is offline") from exc
+    await record_request(
+        request, session, action="computer.emergency_stop", target_type="computer",
+        target_id=computer_id, computer_id=computer_id,
+    )
     return {"status": "emergency_stop_sent"}
 
 
 @router.post("/{computer_id}/reboot", status_code=status.HTTP_202_ACCEPTED)
 async def reboot_computer(
     computer_id: str,
+    request: Request,
     principal: Annotated[SessionPrincipal, Depends(require_api_access("computers:exec"))],
     session: Annotated[AsyncSession, Depends(get_session)],
     gateway: Annotated[WebSocketGateway, Depends(current_gateway)],
@@ -264,4 +297,8 @@ async def reboot_computer(
         )
     except ConnectionError as exc:
         raise HTTPException(status_code=409, detail="Computer is offline") from exc
+    await record_request(
+        request, session, action="computer.reboot", target_type="computer",
+        target_id=computer_id, computer_id=computer_id,
+    )
     return {"status": "reboot_requested"}

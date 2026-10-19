@@ -11,6 +11,7 @@ from sqlalchemy import func, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from aicontrol.audit import record
 from aicontrol.auth.rate_limit import login_rate_limiter
 from aicontrol.auth.schemas import ChangePassword, Credentials
 from aicontrol.auth.sessions import (
@@ -111,6 +112,7 @@ async def setup_admin(
             ) from exc
 
     session_token, csrf_token = await create_browser_session(user, session)
+    await record(session, action="auth.setup", actor_user_id=user.id, target_type="user", target_id=user.id, source_ip=request.client.host if request.client else None)
     return _authenticated_response(request, user, session_token, csrf_token, status.HTTP_201_CREATED)
 
 
@@ -142,6 +144,7 @@ async def register(
         await session.rollback()
         raise HTTPException(status_code=409, detail="Username is unavailable") from exc
     session_token, csrf_token = await create_browser_session(user, session)
+    await record(session, action="auth.register", actor_user_id=user.id, target_type="user", target_id=user.id, source_ip=request.client.host if request.client else None)
     return _authenticated_response(request, user, session_token, csrf_token, status.HTTP_201_CREATED)
 
 
@@ -164,9 +167,22 @@ async def login(
     valid_password = await asyncio.to_thread(verify_secret, password_hash, credentials.password)
     if user is None or user.disabled or not valid_password:
         login_rate_limiter.record_failure(limiter_key)
+        await record(
+            session,
+            action="auth.login",
+            actor_user_id=user.id if user else None,
+            target_type="user",
+            target_id=user.id if user else None,
+            outcome="failure",
+            source_ip=client_host,
+            details={"reason": "invalid_credentials"},
+            commit=False,
+        )
+        await session.commit()
         raise HTTPException(status_code=401, detail="Invalid username or password")
     login_rate_limiter.clear_key(limiter_key)
     session_token, csrf_token = await create_browser_session(user, session)
+    await record(session, action="auth.login", actor_user_id=user.id, target_type="user", target_id=user.id, source_ip=client_host)
     return _authenticated_response(request, user, session_token, csrf_token)
 
 
@@ -184,6 +200,11 @@ async def logout(
 ) -> Response:
     await session.delete(principal.session)
     await session.commit()
+    await record(
+        session, action="auth.logout", actor_user_id=principal.user.id,
+        target_type="user", target_id=principal.user.id,
+        source_ip=request.client.host if request.client else None,
+    )
     clear_auth_cookies(response, secure=secure_cookie_request(request))
     response.status_code = status.HTTP_204_NO_CONTENT
     return response
@@ -216,6 +237,11 @@ async def change_password(
     for browser_session in sessions:
         await session.delete(browser_session)
     await session.commit()
+    await record(
+        session, action="auth.password_change", actor_user_id=principal.user.id,
+        target_type="user", target_id=principal.user.id,
+        source_ip=request.client.host if request.client else None,
+    )
     clear_auth_cookies(response, secure=secure_cookie_request(request))
     response.status_code = status.HTTP_204_NO_CONTENT
     return response

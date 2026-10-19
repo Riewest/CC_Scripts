@@ -63,9 +63,9 @@ vibing/ai-control/
 | [REQ-010](requirements/REQ-010-api-tokens.md) | API tokens | 006 | done |
 | [REQ-011](requirements/REQ-011-teams.md) | Teams | 006, 007 | done |
 | [REQ-012](requirements/REQ-012-groups-sharing.md) | Groups and sharing | 011 | done |
-| [REQ-013](requirements/REQ-013-audit-log.md) | Audit log | 008 | todo |
+| [REQ-013](requirements/REQ-013-audit-log.md) | Audit log | 008 | done |
 
-**STOP POINT 2:** two users, one team, a shared group; verify permissions across viewer/operator/owner; OIDC login with a real provider; audit entries visible.
+**STOP POINT 2 — IMPLEMENTATION COMPLETE; MANUAL VALIDATION PENDING:** M2 requirements REQ-009–013 are implemented and committed. Before declaring STOP POINT 2 fully verified, manually validate with two users, one team and a shared group across viewer/operator/owner permissions and live revocation; sign in using a configured real OIDC provider; and inspect audit activity. Follow-up checklist: [M2 manual validation](requirements/manual-validation/M2-validation-checklist.md). Do not start M3 until authorized.
 
 ### M3 Operator tooling
 | ID | Title | Depends | Status |
