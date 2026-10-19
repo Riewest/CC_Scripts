@@ -1,5 +1,5 @@
 # REQ-012 Groups and sharing
-Status: todo | Milestone: M2 | Depends: REQ-011
+Status: done | Milestone: M2 | Depends: REQ-011
 
 ## Goal
 Computer groups that can be shared, plus per-computer sharing, with viewer/operator/owner roles.
@@ -12,10 +12,10 @@ Computer groups that can be shared, plus per-computer sharing, with viewer/opera
 - UI: group management, share dialog, "shared with me" section.
 
 ## Acceptance criteria
-- [ ] Group CRUD and membership management.
-- [ ] Share to user/team on computer or group; revoke.
-- [ ] Every API endpoint and WS subscription uses `effective_role`; viewer cannot exec.
-- [ ] Revocation takes effect on open UI sockets within seconds.
+- [x] Group CRUD and membership management (personal/team ownership, computer add/remove, ownership constraints).
+- [x] Share to user/team on computer or group; revoke, with owner-level grant administration and redundant/incompatible grants rejected.
+- [x] Current computer APIs and UI WebSocket subscriptions use centralized `effective_role`; viewers can read telemetry/runs but cannot execute, interrupt, reboot or re-pair.
+- [x] Revocation changes access immediately for new HTTP requests and closes existing UI subscriptions within 15 seconds (automated test shortens interval and verifies socket closure).
 
 ## Test plan
 pytest: role matrix per endpoint category, revocation of live subscription, group inheritance.

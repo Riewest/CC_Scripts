@@ -8,6 +8,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from aicontrol.db.models import (
     Computer,
+    ControlGroup,
     GroupMember,
     Share,
     ShareRole,
@@ -62,6 +63,17 @@ async def effective_role(user: User, computer: Computer, session: AsyncSession) 
     group_ids = set(
         await session.scalars(select(GroupMember.group_id).where(GroupMember.computer_id == computer.id))
     )
+    owned_group_ids = set(
+        await session.scalars(
+            select(ControlGroup.id).where(
+                ControlGroup.id.in_(group_ids or [""]),
+                (ControlGroup.owner_user_id == user.id)
+                | (ControlGroup.owner_team_id.in_(user_team_ids or [""])),
+            )
+        )
+    )
+    if owned_group_ids:
+        roles.append(PermissionRole.OWNER)
     targets = [Share.computer_id == computer.id]
     if group_ids:
         targets.append(Share.group_id.in_(group_ids))

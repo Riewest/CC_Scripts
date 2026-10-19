@@ -80,8 +80,18 @@ async def list_computers(
                 )
             )
             allowed_ids.update(group_computer_ids)
-        result = [computer for computer in result if computer.id in allowed_ids]
-    return [_computer_payload(computer) for computer in result]
+        user_allowed_ids = set()
+        for computer_id in allowed_ids:
+            try:
+                await require_computer_role(
+                    principal.user, computer_id, session, PermissionRole.VIEWER
+                )
+            except HTTPException:
+                continue
+            user_allowed_ids.add(computer_id)
+        result = [computer for computer in result if computer.id in user_allowed_ids]
+    roles_by_id = {computer.id: role.name.lower() for computer, role in accessible}
+    return [{**_computer_payload(computer), "effective_role": roles_by_id[computer.id]} for computer in result]
 
 
 @router.get("/{computer_id}")
@@ -90,10 +100,10 @@ async def get_computer(
     principal: Annotated[SessionPrincipal, Depends(require_api_access("computers:read"))],
     session: Annotated[AsyncSession, Depends(get_session)],
 ) -> dict[str, Any]:
-    computer = await _owned_computer(
-        computer_id, principal.user, session, PermissionRole.VIEWER
+    computer, role = await require_computer_role(
+        principal.user, computer_id, session, PermissionRole.VIEWER
     )
-    return _computer_payload(computer)
+    return {**_computer_payload(computer), "effective_role": role.name.lower()}
 
 
 @router.patch("/{computer_id}")

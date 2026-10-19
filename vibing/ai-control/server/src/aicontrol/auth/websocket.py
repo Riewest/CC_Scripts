@@ -5,11 +5,12 @@ from fastapi import APIRouter, Depends, WebSocket, WebSocketDisconnect
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from aicontrol.auth.sessions import SESSION_COOKIE, authenticate_websocket, lookup_session
-from aicontrol.db.models import Computer
 from aicontrol.db.session import get_session
 from aicontrol.gateway.registry import GatewayEvent
+from aicontrol.permissions import PermissionRole, accessible_computers
 
 router = APIRouter()
+SESSION_REVALIDATE_INTERVAL = 15.0
 
 
 @router.websocket("/ws/ui")
@@ -22,6 +23,8 @@ async def ui_websocket(
         await websocket.close(code=4401, reason="Authentication or origin check failed")
         return
     await websocket.accept()
+    accessible = await accessible_computers(user, session)
+    authorized_ids = {computer.id for computer, role in accessible if role >= PermissionRole.VIEWER}
     await websocket.send_json({"type": "ready", "user": user.username})
     event_bus = websocket.app.state.gateway.event_bus
     queue = event_bus.subscribe()
@@ -34,13 +37,21 @@ async def ui_websocket(
                 done, pending = await asyncio.wait(
                     tasks,
                     return_when=asyncio.FIRST_COMPLETED,
-                    timeout=15,
+                    timeout=SESSION_REVALIDATE_INTERVAL,
                 )
             except asyncio.CancelledError:
                 for task in tasks:
                     task.cancel()
                 await asyncio.gather(*tasks, return_exceptions=True)
                 raise
+            if receive_task in done:
+                try:
+                    receive_task.result()
+                except WebSocketDisconnect:
+                    for task in pending:
+                        task.cancel()
+                    await asyncio.gather(*pending, return_exceptions=True)
+                    break
             for task in pending:
                 task.cancel()
             await asyncio.gather(*pending, return_exceptions=True)
@@ -51,13 +62,19 @@ async def ui_websocket(
                 if principal is None:
                     await websocket.close(code=4401, reason="Session expired or disabled")
                     return
+                current_access = await accessible_computers(principal.user, session)
+                current_ids = {
+                    computer.id
+                    for computer, role in current_access
+                    if role >= PermissionRole.VIEWER
+                }
+                if current_ids != authorized_ids:
+                    await websocket.close(code=4403, reason="Computer permissions changed; reconnect")
+                    return
                 continue
-            if receive_task in done:
-                receive_task.result()
             if event_task in done:
                 event: GatewayEvent = event_task.result()
-                computer = await session.get(Computer, event.computer_id)
-                if computer is not None and computer.owner_user_id == user.id:
+                if event.computer_id in authorized_ids:
                     payload = {
                         "type": event.name,
                         "computer_id": event.computer_id,

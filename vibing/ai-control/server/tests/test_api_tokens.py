@@ -201,3 +201,45 @@ def test_normal_user_cannot_create_admin_scoped_token(token_client):
         token_client, token_client.cookies["aic_csrf"], scopes=["admin"]
     )
     assert response.status_code == 403
+
+
+def test_token_resource_allowlist_does_not_exceed_user_share_permissions(token_client):
+    from aicontrol.db.models import Share, ShareRole
+
+    owner_id, _ = _admin(token_client)
+    _personal_computers(token_client, owner_id, "shared-token-device")
+    token_client.post("/api/auth/register", json={"username": "recipient", "password": "another-long-password"})
+    recipient_id = token_client.get("/api/auth/me").json()["id"]
+    token_client.post("/api/auth/logout", headers={"x-csrf-token": token_client.cookies["aic_csrf"]})
+    token_client.post("/api/auth/login", json={"username": "admin", "password": "a-very-long-password"})
+
+    async def create_grant() -> None:
+        engine = create_async_engine(token_client.app.state.test_database_url)
+        factory = async_sessionmaker(engine)
+        async with factory() as session:
+            session.add(Share(subject_user_id=recipient_id, computer_id="shared-token-device", role=ShareRole.VIEWER))
+            await session.commit()
+        await engine.dispose()
+
+    asyncio.run(create_grant())
+    token_client.post("/api/auth/logout", headers={"x-csrf-token": token_client.cookies["aic_csrf"]})
+    token_client.post("/api/auth/login", json={"username": "recipient", "password": "another-long-password"})
+    token = _create_token(
+        token_client, token_client.cookies["aic_csrf"], scopes=["computers:read"],
+        computer_ids=["shared-token-device"],
+    ).json()
+    assert token_client.get("/api/computers/shared-token-device").status_code == 200
+
+    async def revoke_grant() -> None:
+        engine = create_async_engine(token_client.app.state.test_database_url)
+        factory = async_sessionmaker(engine)
+        async with factory() as session:
+            share = await session.scalar(select(Share).where(Share.subject_user_id == recipient_id))
+            await session.delete(share)
+            await session.commit()
+        await engine.dispose()
+
+    asyncio.run(revoke_grant())
+    assert token_client.get(
+        "/api/computers/shared-token-device", headers={"Authorization": f"Bearer {token['token']}"}
+    ).status_code == 403

@@ -35,9 +35,9 @@ export function Teams({ onBack }: { onBack: () => void }) {
   }, [])
   useEffect(() => { void refresh() }, [refresh])
   useEffect(() => {
-    const inviteToken = new URLSearchParams(window.location.search).get('team_invite')
+    const inviteToken = new URLSearchParams(window.location.hash.slice(1)).get('team_invite')
     if (!inviteToken) return
-    window.history.replaceState({}, '', window.location.pathname)
+    window.history.replaceState({}, '', window.location.pathname + window.location.search)
     void api(`/api/teams/invites/${encodeURIComponent(inviteToken)}/accept`, { method: 'POST' })
       .then(refresh)
       .catch((reason: unknown) => setError(reason instanceof Error ? reason.message : 'Could not accept invitation'))
@@ -54,7 +54,7 @@ export function Teams({ onBack }: { onBack: () => void }) {
       const result = await api<{ invite_token: string; expires_at: string }>(`/api/teams/${encodeURIComponent(team.id)}/invites`, { method: 'POST', body: JSON.stringify({ username: inviteNames[team.id] ?? '' }) })
       setCreatedInvite(result.invite_token)
       setInviteNames((current) => ({ ...current, [team.id]: '' }))
-      await navigator.clipboard.writeText(`${window.location.origin}/?team_invite=${encodeURIComponent(result.invite_token)}`).catch(() => undefined)
+      await navigator.clipboard.writeText(`${window.location.origin}/#team_invite=${encodeURIComponent(result.invite_token)}`).catch(() => undefined)
       await refresh()
     } catch (reason) { setError(reason instanceof Error ? reason.message : 'Could not invite user') }
   }
@@ -92,7 +92,7 @@ export function Teams({ onBack }: { onBack: () => void }) {
     <main className="dashboard-content admin-content">
       <p className="eyebrow">COLLABORATION</p><h1 className="dashboard-title">Teams</h1><p className="intro dashboard-intro">Teams own devices together. Team members can see every team computer; the default member role controls their capabilities.</p>
       {error && <p className="error-banner">{error}</p>}
-      {createdInvite && <section className="token-once"><strong>Invitation link copied. Share only with the invited username.</strong><code>{window.location.origin}/?team_invite={encodeURIComponent(createdInvite)}</code><button className="text-button" onClick={() => setCreatedInvite('')}>Dismiss</button></section>}
+      {createdInvite && <section className="token-once"><strong>Invitation link copied. Share only with the invited username.</strong><code>{window.location.origin}/#team_invite={encodeURIComponent(createdInvite)}</code><button className="text-button" onClick={() => setCreatedInvite('')}>Dismiss</button></section>}
       <form className="pairing-card team-create" onSubmit={(event) => void createTeam(event)}><label className="field-label" htmlFor="team-name">TEAM NAME</label><input id="team-name" value={teamName} onChange={(event) => setTeamName(event.target.value)} maxLength={120} required /><label className="field-label" htmlFor="team-default-role">DEFAULT MEMBER ROLE</label><select id="team-default-role" value={defaultRole} onChange={(event) => setDefaultRole(event.target.value as 'viewer' | 'operator')}><option value="viewer">Viewer · telemetry and runs</option><option value="operator">Operator · viewer plus execution</option></select><button className="primary-button">Create team<span>→</span></button></form>
       {invites.length > 0 && <section className="team-section"><p className="field-label">PENDING INVITATIONS</p>{invites.map((inviteItem) => <article className="admin-user" key={inviteItem.id}><div><strong>{inviteItem.team_name}</strong><small>Expires {new Date(inviteItem.expires_at).toLocaleString()}</small></div><button className="primary-button team-action" onClick={() => void accept(inviteItem.id)}>Accept</button></article>)}</section>}
       <section className="team-section"><p className="field-label">YOUR TEAMS</p>{teams.length === 0 && <p className="muted-text">You are not a member of any teams yet.</p>}{teams.map((team) => <article className="team-card" key={team.id}>

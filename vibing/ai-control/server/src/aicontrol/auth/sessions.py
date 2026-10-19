@@ -211,6 +211,12 @@ async def authorize_api_request(
                     allowed_by_group = membership is not None
                 if not allowed_by_group:
                     raise HTTPException(status_code=403, detail="API token is not scoped to this computer")
+        from aicontrol.db.models import Computer
+        from aicontrol.permissions import PermissionRole, effective_role
+
+        computer = await session.get(Computer, computer_id)
+        if computer is None or await effective_role(principal.user, computer, session) == PermissionRole.NONE:
+            raise HTTPException(status_code=403, detail="API token user has no access to this computer")
     return principal
 
 

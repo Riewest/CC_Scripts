@@ -10,6 +10,7 @@ type Computer = {
   telemetry: Record<string, unknown> | null
   owner_team_id?: string | null
   ownership?: 'team' | 'personal'
+  effective_role?: 'viewer' | 'operator' | 'owner'
 }
 
 type Run = {
@@ -78,6 +79,7 @@ export function Dashboard({
   onAdmin,
   onTokens,
   onTeams,
+  onGroups,
   isAdmin,
 }: {
   onAddComputer: () => void
@@ -86,6 +88,7 @@ export function Dashboard({
   onAdmin: () => void
   onTokens: () => void
   onTeams: () => void
+  onGroups: () => void
   isAdmin: boolean
 }) {
   const [computers, setComputers] = useState<Computer[]>([])
@@ -235,7 +238,7 @@ export function Dashboard({
       <header className="topbar">
         <a className="brand" href="#" onClick={(event) => event.preventDefault()}><span className="brand-mark">⌘</span><span>AI Control</span></a>
         <span className={`connection ${websocketState === 'live' ? '' : 'dimmed'}`}><i /> {websocketState === 'live' ? 'Live connection' : websocketState}</span>
-        <div className="topbar-actions">{isAdmin && <button className="text-button" onClick={onAdmin}>Admin</button>}<button className="text-button" onClick={onTeams}>Teams</button><button className="text-button" onClick={onTokens}>API tokens</button>{oidcProviders.map((provider) => <button className="text-button" key={provider} onClick={() => void linkIdentity(provider)}>Link {provider}</button>)}<button className="nav-action" onClick={onAddComputer}>＋ Add computer</button><button className="text-button" onClick={() => void logout()}>Sign out</button></div>
+        <div className="topbar-actions">{isAdmin && <button className="text-button" onClick={onAdmin}>Admin</button>}<button className="text-button" onClick={onTeams}>Teams</button><button className="text-button" onClick={onGroups}>Groups</button><button className="text-button" onClick={onTokens}>API tokens</button>{oidcProviders.map((provider) => <button className="text-button" key={provider} onClick={() => void linkIdentity(provider)}>Link {provider}</button>)}<button className="nav-action" onClick={onAddComputer}>＋ Add computer</button><button className="text-button" onClick={() => void logout()}>Sign out</button></div>
       </header>
       <main className="dashboard-content">
         <div className="dashboard-heading"><div><p className="eyebrow">YOUR CONTROL ROOM</p><h1 className="dashboard-title">Computer fleet</h1><p className="intro dashboard-intro">Devices connected to your account, ready when you are.</p></div><div className="fleet-count"><strong>{onlineCount}</strong><span>ONLINE <b>·</b> {computers.length} TOTAL</span></div></div>
@@ -254,7 +257,7 @@ export function Dashboard({
               </button>)}
             </aside>
             {selected && <section className="computer-detail">
-              <div className="detail-header"><div><p className="eyebrow">{selected.kind.toUpperCase()} · {selected.status.toUpperCase()}</p><h2>{selected.label}</h2><p className="muted-text">Last seen {selected.last_seen ? new Date(selected.last_seen).toLocaleString() : 'never'}{selected.cc_version ? ` · CC ${selected.cc_version}` : ''}</p></div><div className="detail-actions"><button className="secondary-button" onClick={() => onRepairComputer(selected)}>Re-pair</button><button className="secondary-button" onClick={() => void renameComputer()}>Rename</button><button className="secondary-button" disabled={selected.status !== 'online'} onClick={() => void reboot()}>Reboot</button></div></div>
+              <div className="detail-header"><div><p className="eyebrow">{selected.kind.toUpperCase()} · {selected.status.toUpperCase()} · {(selected.effective_role ?? 'owner').toUpperCase()}</p><h2>{selected.label}</h2><p className="muted-text">Last seen {selected.last_seen ? new Date(selected.last_seen).toLocaleString() : 'never'}{selected.cc_version ? ` · CC ${selected.cc_version}` : ''}</p></div><div className="detail-actions">{(selected.effective_role ?? 'owner') === 'owner' && <><button className="secondary-button" onClick={() => onRepairComputer(selected)}>Re-pair</button><button className="secondary-button" onClick={() => void renameComputer()}>Rename</button><button className="secondary-button" disabled={selected.status !== 'online'} onClick={() => void reboot()}>Reboot</button></>}</div></div>
               <div className="telemetry-grid">
                 <div className="telemetry-tile"><span>FUEL</span><strong>{pretty(selected.telemetry?.fuel)}</strong></div>
                 <div className="telemetry-tile"><span>FUEL LIMIT</span><strong>{pretty(selected.telemetry?.fuel_limit)}</strong></div>
@@ -271,7 +274,7 @@ export function Dashboard({
                 <div className="equipment-tile"><span>RIGHT EQUIPMENT</span><strong>{equipmentLabel(selected.telemetry.equipped_right)}</strong></div>
               </div>}
               {Array.isArray(selected.telemetry?.peripherals) && <details className="inventory-panel"><summary>Peripherals · {selected.telemetry.peripherals.length} attached</summary><pre>{JSON.stringify(selected.telemetry.peripherals, null, 2)}</pre></details>}
-              <div className="editor-panel"><div className="editor-heading"><div><p className="eyebrow">REMOTE LUA</p><h3>Run a program</h3></div><div className="detail-actions"><button className="secondary-button" disabled={selected.status !== 'online'} onClick={() => void interrupt()}>Stop</button><button className="danger-button" disabled={selected.status !== 'online'} onClick={() => void interrupt(true)}>Emergency stop</button><button className="primary-button run-button" disabled={selected.status !== 'online' || busy || !code.trim()} onClick={() => void runCode()}>{busy ? 'Running…' : '▶ Run'}</button></div></div>
+              <div className="editor-panel"><div className="editor-heading"><div><p className="eyebrow">REMOTE LUA</p><h3>{(selected.effective_role ?? 'owner') === 'viewer' ? 'Read-only access' : 'Run a program'}</h3></div><div className="detail-actions">{(selected.effective_role ?? 'owner') !== 'viewer' && <><button className="secondary-button" disabled={selected.status !== 'online'} onClick={() => void interrupt()}>Stop</button><button className="danger-button" disabled={selected.status !== 'online'} onClick={() => void interrupt(true)}>Emergency stop</button><button className="primary-button run-button" disabled={selected.status !== 'online' || busy || !code.trim()} onClick={() => void runCode()}>{busy ? 'Running…' : '▶ Run'}</button></>}</div></div>
                 <textarea className="lua-editor" aria-label="Lua code" value={code} onChange={(event) => setCode(event.target.value)} spellCheck={false} />
                 {notice && <div className="run-result"><p className="result-heading">{latestResult?.ok ? 'EXECUTION COMPLETE' : latestResult?.error ? 'EXECUTION ERROR' : 'EXECUTION STATUS'}</p>{latestResult?.output && <pre className="output-pane">{latestResult.output}</pre>}{latestResult?.return_values && latestResult.return_values.length > 0 && <div className="return-values"><span>RETURN VALUES</span><pre>{JSON.stringify(latestResult.return_values, null, 2)}</pre></div>}{latestResult?.error && <div className="error-result"><strong>{latestResult.error}</strong>{latestResult.traceback && <pre>{latestResult.traceback}</pre>}</div>}{!latestResult?.output && !latestResult?.error && <pre className="output-pane">{notice}</pre>}</div>}
                 {runs.length > 0 && <details className="run-history"><summary>Recent runs ({runs.length})</summary>{runs.map((run) => <article className="run-entry" key={run.id}><div className="run-meta"><span>{new Date(run.started_at).toLocaleString()}</span><span className={run.result?.ok ? 'result-ok' : 'result-error'}>{run.result?.ok ? 'OK' : run.result?.error ? 'ERROR' : 'RUNNING'}</span></div><pre>{run.result?.output || ''}{run.result?.return_values?.length ? `\nReturn: ${JSON.stringify(run.result.return_values)}` : ''}{run.result?.error ? `\n${run.result.error}\n${run.result.traceback ?? ''}` : ''}</pre></article>)}</details>}

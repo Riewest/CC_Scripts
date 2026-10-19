@@ -195,3 +195,10 @@ footer b { color: var(--green); font-weight: 400; }
 .member-row .secondary-button { padding: 6px 8px; font-size: 10px; }
 .team-action { width: auto; padding: 9px 12px; }
 .team-leave { margin: 12px 0 0 auto; }
+.share-form { display: grid; gap: 14px; margin-top: 30px; }
+.share-form > .field-label { margin: 0; }
+.share-fields { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+.share-fields select { width: 100%; margin-top: 5px; border: 1px solid #ffffff24; border-radius: 7px; background: #0c110e; color: #f1f4f0; padding: 10px; }
+.group-computers { margin-top: 12px; }
+.group-computers .member-row { padding-left: 8px; }
+@media (max-width: 600px) { .share-fields { grid-template-columns: 1fr; } }

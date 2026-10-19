@@ -16,8 +16,18 @@ from aicontrol.auth.sessions import (
     require_csrf,
     token_digest,
 )
-from aicontrol.db.models import ApiToken, Computer, ControlGroup, UserRole, utc_now
+from aicontrol.db.models import (
+    ApiToken,
+    Computer,
+    ControlGroup,
+    Share,
+    TeamMember,
+    TeamRole,
+    UserRole,
+    utc_now,
+)
 from aicontrol.db.session import get_session
+from aicontrol.permissions import PermissionRole, effective_role
 
 router = APIRouter(prefix="/api/auth/tokens", tags=["api-tokens"])
 
@@ -75,22 +85,43 @@ async def _owned_resource_ids(
     payload: CreateTokenRequest,
 ) -> None:
     if payload.computer_ids:
-        computers = await session.scalars(
-            select(Computer.id).where(
-                Computer.id.in_(payload.computer_ids),
-                Computer.owner_user_id == principal.user.id,
-            )
-        )
-        if set(computers) != set(payload.computer_ids):
+        computers = await session.scalars(select(Computer).where(Computer.id.in_(payload.computer_ids)))
+        accessible_ids = {
+            computer.id
+            for computer in computers
+            if await effective_role(principal.user, computer, session) >= PermissionRole.VIEWER
+        }
+        if accessible_ids != set(payload.computer_ids):
             raise HTTPException(status_code=404, detail="One or more computers were not found")
     if payload.group_ids:
-        groups = await session.scalars(
-            select(ControlGroup.id).where(
-                ControlGroup.id.in_(payload.group_ids),
-                ControlGroup.owner_user_id == principal.user.id,
+        groups = await session.scalars(select(ControlGroup).where(ControlGroup.id.in_(payload.group_ids)))
+        owned_group_ids = set()
+        for group in groups:
+            if group.owner_user_id == principal.user.id:
+                owned_group_ids.add(group.id)
+                continue
+            if group.owner_team_id and await session.scalar(
+                select(TeamMember.id).where(
+                    TeamMember.team_id == group.owner_team_id,
+                    TeamMember.user_id == principal.user.id,
+                    TeamMember.role == TeamRole.OWNER,
+                ).limit(1)
+            ):
+                owned_group_ids.add(group.id)
+                continue
+            user_team_ids = select(TeamMember.team_id).where(
+                TeamMember.user_id == principal.user.id
             )
-        )
-        if set(groups) != set(payload.group_ids):
+            group_grant = await session.scalar(
+                select(Share.id).where(
+                    Share.group_id == group.id,
+                    (Share.subject_user_id == principal.user.id)
+                    | Share.subject_team_id.in_(user_team_ids),
+                ).limit(1)
+            )
+            if group_grant is not None:
+                owned_group_ids.add(group.id)
+        if owned_group_ids != set(payload.group_ids):
             raise HTTPException(status_code=404, detail="One or more groups were not found")
 
 

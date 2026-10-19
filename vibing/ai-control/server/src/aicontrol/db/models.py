@@ -208,7 +208,15 @@ class PairingCode(TimestampMixin, Base):
 
 class ControlGroup(TimestampMixin, Base):
     __tablename__ = "groups"
-    __table_args__ = (Index("ix_groups_owner_user_id", "owner_user_id"), Index("ix_groups_owner_team_id", "owner_team_id"))
+    __table_args__ = (
+        CheckConstraint(
+            "(owner_user_id IS NOT NULL AND owner_team_id IS NULL) OR "
+            "(owner_user_id IS NULL AND owner_team_id IS NOT NULL)",
+            name="ck_group_exactly_one_owner",
+        ),
+        Index("ix_groups_owner_user_id", "owner_user_id"),
+        Index("ix_groups_owner_team_id", "owner_team_id"),
+    )
 
     id: Mapped[str] = mapped_column(String(36), primary_key=True, default=new_id)
     name: Mapped[str] = mapped_column(String(120), nullable=False)
