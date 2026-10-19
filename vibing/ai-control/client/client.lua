@@ -322,6 +322,15 @@ local function outputEnvironment(capture)
     local realPrint = print
     local realWrite = write
     environment.error = error
+    -- CC:Tweaked exposes several APIs through the global environment's __index,
+    -- so pairs(_ENV) does not include them in the shallow copy above.
+    environment.turtle = turtle
+    environment.peripheral = peripheral
+    environment.fs = fs
+    environment.http = http
+    environment.redstone = redstone
+    environment.commands = commands
+    environment.gps = gps
     environment.print = function(...)
         local values = {}
         for index = 1, select("#", ...) do
@@ -424,14 +433,17 @@ local function runProgram(message)
             os.queueEvent("aicontrol_program_tick")
             os.pullEvent("aicontrol_program_tick")
             resumeArgs = {}
-        elseif packedOrError == EVENT_YIELD then
+        elseif packedOrError == EVENT_YIELD or type(packedOrError) == "string" then
+            -- Lua wrappers yield EVENT_YIELD; CC:Tweaked's native APIs (including
+            -- turtle methods) yield their event filter directly from the C API.
+            local eventFilter = packedOrError == EVENT_YIELD and yieldedFilter or packedOrError
             while true do
                 local event = table.pack(os.pullEventRaw())
                 if interruptRequested then
                     interrupted = true
                     break
                 end
-                if not yieldedFilter or event[1] == yieldedFilter or event[1] == "terminate" then
+                if not eventFilter or event[1] == eventFilter or event[1] == "terminate" then
                     resumeArgs = { table.unpack(event, 1, event.n) }
                     break
                 end
@@ -594,12 +606,6 @@ local function sendTelemetry()
             if ok and detail then
                 detail.slot = slot
                 values.inventory[#values.inventory + 1] = detail
-            end
-        end
-        for side, method in pairs({ left = "getEquippedLeft", right = "getEquippedRight" }) do
-            if turtle[method] then
-                local ok, equipped = pcall(turtle[method])
-                if ok then values["equipped_" .. side] = equipped end
             end
         end
     end

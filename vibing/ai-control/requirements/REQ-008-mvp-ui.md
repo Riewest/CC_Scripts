@@ -52,11 +52,11 @@ The integrated M1 stop-point checks below require a real CC:Tweaked server and a
 
 	Confirm each displays its error and traceback in the result panel/history.
 4. Run `while true do end`, press Stop, and verify completion with an interrupted result. **Also verified on Computer 15:** a loop that prints and calls `os.sleep(1)` ran repeatedly, then Stop interrupted it and returned the captured output. To verify emergency queue clearing, open the same computer in a second browser tab/session, start one long program in each, then press Emergency stop. Confirm the active program stops and queued program(s) are returned as cancelled. Do not run this on a turtle while it is doing unsafe work.
-5. With a turtle online, check the fuel, selected slot, 16-slot inventory grid, peripherals and position fields on its detail panel. Use Reboot only when safe; verify it becomes offline and returns online.
+5. **Partially verified on Computer 14 (turtle):** after rebooting to install the client update, `turtle.refuel(64)` ran without an execution/coroutine error. The detailed equipped-item JSON row has been removed; the dashboard keeps the compact fuel/slot/position tiles and inventory grid. Still check fuel, selected slot, 16-slot inventory grid, peripherals and position fields; use Reboot only when safe and verify it reconnects.
 6. Stop/restart Docker with the REQ-005 addendum procedure; the UI should show offline, then live status/telemetry again when each client reconnects.
 7. Sign out and verify `/api/computers` is no longer accessible without logging in. Sign in as another account (if signup has been enabled for testing) and verify it cannot see the first owner's devices.
 
-The harmless output/return-value check, both compile/runtime traceback checks, and Stop during a timer-based `os.sleep(1)` loop passed on Computer 15 on 2026-10-19. Remaining integrated M1 STOP POINT 1 checks are fresh pairing, the tight busy-loop interrupt, emergency queue cancellation, turtle/pocket telemetry, and Docker stop/start reconnect. Record those outcomes before proceeding to M2.
+The harmless output/return-value check, both compile/runtime traceback checks, and Stop during a timer-based `os.sleep(1)` loop passed on Computer 15 on 2026-10-19. The turtle API invocation passed on Computer 14; remaining integrated M1 STOP POINT 1 checks are fresh pairing, the tight busy-loop interrupt, emergency queue cancellation, full turtle/pocket telemetry inspection, and Docker stop/start reconnect. Record those outcomes before proceeding to M2.
 
 ## Pairing countdown timezone fix
 
