@@ -115,6 +115,10 @@ footer b { color: var(--green); font-weight: 400; }
 .telemetry-tile { min-width: 0; border: 1px solid #ffffff12; border-radius: 8px; background: #0c110e8a; padding: 11px; }
 .telemetry-tile span { display: block; overflow: hidden; color: #839080; font: 8px 'DM Mono', monospace; letter-spacing: .04em; text-overflow: ellipsis; white-space: nowrap; }
 .telemetry-tile strong { display: block; overflow: hidden; margin-top: 8px; color: #e5ece0; font: 12px 'DM Mono', monospace; text-overflow: ellipsis; white-space: nowrap; }
+.position-value { display: flex; min-width: 0; align-items: center; justify-content: space-between; gap: 6px; }
+.position-value strong { overflow: hidden; margin-top: 8px; color: #e5ece0; font: 12px 'DM Mono', monospace; text-overflow: ellipsis; white-space: nowrap; }
+.copy-position { flex: none; border: 1px solid #ffffff20; border-radius: 5px; background: #ffffff08; color: #b7c4ae; padding: 4px 6px; font: 8px 'DM Mono', monospace; cursor: pointer; }
+.copy-position:hover { border-color: #b6e08a66; color: #e5ece0; }
 .inventory-panel { margin: 9px 0; border: 1px solid #ffffff15; border-radius: 8px; color: #adb7aa; padding: 11px 13px; font-size: 11px; }
 .inventory-panel summary, .run-history summary { cursor: pointer; }
 .inventory-panel pre, .run-entry pre { max-height: 220px; overflow: auto; color: #c3d4b8; font: 10px/1.6 'DM Mono', monospace; white-space: pre-wrap; }

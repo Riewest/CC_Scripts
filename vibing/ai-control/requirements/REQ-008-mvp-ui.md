@@ -58,7 +58,7 @@ The integrated M1 stop-point checks below require a real CC:Tweaked server and a
 6. Stop/restart Docker with the REQ-005 addendum procedure; the UI should show offline, then live status/telemetry again when each client reconnects.
 7. Sign out and verify `/api/computers` is no longer accessible without logging in. Sign in as another account (if signup has been enabled for testing) and verify it cannot see the first owner's devices.
 
-The harmless output/return-value check, both compile/runtime traceback checks, and Stop during a timer-based `os.sleep(1)` loop passed on Computer 15 on 2026-10-19. The turtle API invocation passed on Computer 14; remaining integrated M1 STOP POINT 1 checks are fresh pairing, the tight busy-loop interrupt, emergency queue cancellation, full turtle/pocket telemetry inspection, and Docker stop/start reconnect. Record those outcomes before proceeding to M2.
+The harmless output/return-value check, both compile/runtime traceback checks, timer-loop Stop, tight-loop Stop, Emergency stop queue cancellation, pocket pairing/run, sign-out authorization, reconnect, and turtle telemetry inspection were confirmed by the user on 2026-10-19. Follow-up implementation formats turtle coordinates as copyable `X Y Z` and refreshes telemetry after a remote program completes or a peripheral attaches/detaches. See [M0/M1 Manual Validation Checklist](../docs/m0-m1-manual-validation.md) for the outcomes. The updated coordinate/copy and immediate telemetry refresh behavior should receive a quick live confirmation after this deployment before closing STOP POINT 1.
 
 ## Pairing countdown timezone fix
 

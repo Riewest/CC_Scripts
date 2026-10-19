@@ -58,6 +58,17 @@ function equipmentLabel(value: unknown): string {
   return details.length ? `${label} · ${details.join(' · ')}` : label
 }
 
+function coordinateText(value: unknown): string | null {
+  if (!value || typeof value !== 'object') return null
+  const position = value as { x?: unknown; y?: unknown; z?: unknown }
+  const coordinates = [position.x, position.y, position.z].map((coordinate) => {
+    if (typeof coordinate === 'number' && Number.isFinite(coordinate)) return String(coordinate)
+    if (typeof coordinate === 'string' && coordinate.trim() !== '' && Number.isFinite(Number(coordinate))) return String(Number(coordinate))
+    return null
+  })
+  return coordinates.every((coordinate) => coordinate !== null) ? coordinates.join(' ') : null
+}
+
 export function Dashboard({
   onAddComputer,
   onRepairComputer,
@@ -77,6 +88,7 @@ export function Dashboard({
   const [error, setError] = useState('')
   const [notice, setNotice] = useState('')
   const [websocketState, setWebsocketState] = useState('connecting')
+  const [copiedPosition, setCopiedPosition] = useState('')
 
   const refreshComputers = useCallback(async () => {
     try {
@@ -123,7 +135,18 @@ export function Dashboard({
   }, [refreshComputers, refreshRuns])
 
   const selected = useMemo(() => computers.find((computer) => computer.id === selectedId) ?? null, [computers, selectedId])
+  const selectedPosition = coordinateText(selected?.telemetry?.position)
   const onlineCount = computers.filter((computer) => computer.status === 'online').length
+
+  async function copyPosition() {
+    if (!selectedPosition) return
+    try {
+      await navigator.clipboard.writeText(selectedPosition)
+      setCopiedPosition(selectedPosition)
+    } catch {
+      setError('Could not copy coordinates. Select and copy the displayed coordinate text instead.')
+    }
+  }
 
   async function runCode() {
     if (!selected) return
@@ -207,7 +230,7 @@ export function Dashboard({
                 <div className="telemetry-tile"><span>FUEL</span><strong>{pretty(selected.telemetry?.fuel)}</strong></div>
                 <div className="telemetry-tile"><span>FUEL LIMIT</span><strong>{pretty(selected.telemetry?.fuel_limit)}</strong></div>
                 <div className="telemetry-tile"><span>SELECTED SLOT</span><strong>{pretty(selected.telemetry?.selected_slot)}</strong></div>
-                <div className="telemetry-tile"><span>POSITION</span><strong>{pretty(selected.telemetry?.position)}</strong></div>
+                <div className="telemetry-tile position-tile"><span>POSITION · X Y Z</span><div className="position-value"><strong>{selectedPosition ?? '—'}</strong>{selectedPosition && <button className="copy-position" type="button" onClick={() => void copyPosition()} aria-label="Copy coordinates">{copiedPosition === selectedPosition ? 'Copied' : 'Copy'}</button>}</div></div>
               </div>
               {selected.kind === 'turtle' && Array.isArray(selected.telemetry?.inventory) && <details className="inventory-panel" open><summary>Inventory · {selected.telemetry.inventory.length} occupied slots</summary><div className="inventory-grid">{Array.from({ length: 16 }, (_, index) => {
                 const slot = index + 1

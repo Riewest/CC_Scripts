@@ -373,6 +373,8 @@ local function outputEnvironment(capture)
     return environment
 end
 
+local sendTelemetry
+
 local function runProgram(message)
     local data = message.data
     activeExecutionId = message.id
@@ -395,6 +397,7 @@ local function runProgram(message)
             debug.traceback(tostring(compileError), 2),
             nowMs() - started
         )
+        sendTelemetry()
         activeExecutionId = nil
         return
     end
@@ -491,6 +494,7 @@ local function runProgram(message)
         programTraceback,
         nowMs() - started
     )
+    sendTelemetry()
     activeExecutionId = nil
     interruptRequested = false
     for _, interrupt in ipairs(pendingInterruptIds) do
@@ -582,7 +586,7 @@ local function handleIncoming(message)
     end
 end
 
-local function sendTelemetry()
+sendTelemetry = function()
     local kind = (turtle and "turtle") or (pocket and "pocket") or "computer"
     local values = {
         device_id = config.device_id,
@@ -708,6 +712,15 @@ local function heartbeatLoop()
     end
 end
 
+local function telemetryEventLoop()
+    while true do
+        local event = os.pullEventRaw()
+        if event == "peripheral" or event == "peripheral_detach" then
+            sendTelemetry()
+        end
+    end
+end
+
 local function executionLoop()
     while true do
         local message = table.remove(pendingExecutions, 1)
@@ -761,7 +774,7 @@ local function runConnection()
         saveConfig()
     end
     sendTelemetry()
-    local completedLoop = parallel.waitForAny(readerLoop, heartbeatLoop, executionLoop)
+    local completedLoop = parallel.waitForAny(readerLoop, heartbeatLoop, executionLoop, telemetryEventLoop)
     log("connection worker " .. tostring(completedLoop) .. " ended; reconnecting")
     socket.close()
     socket = nil

@@ -19,7 +19,7 @@ A Lua client that installs with one command, stays connected, runs server-sent c
 - [x] Installer and `startup.lua` work on computer, turtle and pocket computer (manual checklist).
 - [x] Client reconnects after server restart and network loss.
 - [x] Runtime and compile errors return message and traceback to the server (manually verified through the integrated UI on Computer 15).
-- [ ] Interrupt stops a `while true do end` loop within a second (manual) and the fake-client test covers the protocol side.
+- [x] Interrupt stops a `while true do end` loop within a second (manually verified by the user on Computer 15) and the fake-client test covers the protocol side.
 - [x] Output and return values are captured and returned, truncated at the size limit with a marker (manually verified output plus both return values through the integrated UI).
 - [x] Self-update replaces changed files and restarts cleanly (updated client downloaded through the startup manifest, then connected successfully).
 - [x] Manifest and file endpoints implemented and tested server-side.
