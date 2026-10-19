@@ -5,6 +5,8 @@ from fastapi import FastAPI, HTTPException
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 
+from aicontrol.auth.routes import router as auth_router
+from aicontrol.auth.websocket import router as auth_websocket_router
 from aicontrol.config import Settings, get_settings
 from aicontrol.gateway.registry import WebSocketGateway
 from aicontrol.gateway.router import router as gateway_router
@@ -29,6 +31,8 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app = FastAPI(title="AI Control", debug=app_settings.environment == "development")
     app.state.gateway = WebSocketGateway(app_settings)
     app.include_router(gateway_router)
+    app.include_router(auth_router)
+    app.include_router(auth_websocket_router)
     web_dist = _find_web_dist(app_settings)
 
     @app.get("/api/health", tags=["health"])

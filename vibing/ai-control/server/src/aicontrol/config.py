@@ -16,6 +16,7 @@ class Settings(BaseSettings):
     heartbeat_timeout_s: float = Field(default=90.0, gt=0)
     database_url: str = "sqlite:///./aicontrol.db"
     environment: str = "development"
+    allow_signup: bool = False
     web_dist_dir: Path | None = None
     secret_encryption_key: str | None = None
 

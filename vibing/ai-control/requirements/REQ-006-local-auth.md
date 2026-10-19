@@ -1,5 +1,5 @@
 # REQ-006 Local auth and sessions
-Status: todo | Milestone: M1 | Depends: REQ-002
+Status: done | Milestone: M1 | Depends: REQ-002
 
 ## Goal
 Username/password login with secure sessions protecting the API and UI.
@@ -14,12 +14,12 @@ Username/password login with secure sessions protecting the API and UI.
 - WebSocket auth for the browser: same session cookie validated on connect, with origin check.
 
 ## Acceptance criteria
-- [ ] Signup toggle respected; first-user bootstrap works once only.
-- [ ] Wrong password and unknown user give identical responses.
-- [ ] Rate limiting blocks brute force.
-- [ ] Unauthenticated access to protected routes returns 401.
-- [ ] CSRF check enforced on mutating cookie-auth requests.
-- [ ] Logout invalidates the session server-side.
+- [x] Signup toggle respected; first-user bootstrap works once only.
+- [x] Wrong password and unknown user give identical responses.
+- [x] Rate limiting blocks brute force.
+- [x] Unauthenticated access to protected routes returns 401.
+- [x] CSRF check enforced on mutating cookie-auth requests.
+- [x] Logout invalidates the session server-side.
 
 ## Test plan
 pytest: hashing, login/logout, bootstrap, rate limit, CSRF, protected routes.
