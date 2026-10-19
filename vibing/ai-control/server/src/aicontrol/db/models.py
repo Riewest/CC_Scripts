@@ -114,8 +114,12 @@ class Team(TimestampMixin, Base):
     id: Mapped[str] = mapped_column(String(36), primary_key=True, default=new_id)
     name: Mapped[str] = mapped_column(String(120), nullable=False)
     slug: Mapped[str] = mapped_column(String(80), nullable=False)
+    default_member_role: Mapped[ShareRole] = mapped_column(
+        Enum(ShareRole), default=ShareRole.OPERATOR, nullable=False
+    )
     memberships: Mapped[list[TeamMember]] = relationship(back_populates="team", cascade="all, delete-orphan")
     computers: Mapped[list[Computer]] = relationship(back_populates="owner_team")
+    invites: Mapped[list[TeamInvite]] = relationship(back_populates="team", cascade="all, delete-orphan")
 
 
 class TeamMember(TimestampMixin, Base):
@@ -128,6 +132,20 @@ class TeamMember(TimestampMixin, Base):
     role: Mapped[TeamRole] = mapped_column(Enum(TeamRole), default=TeamRole.MEMBER, nullable=False)
     team: Mapped[Team] = relationship(back_populates="memberships")
     user: Mapped[User] = relationship(back_populates="team_memberships")
+
+
+class TeamInvite(TimestampMixin, Base):
+    __tablename__ = "team_invites"
+    __table_args__ = (Index("ix_team_invites_token_hash", "token_hash", unique=True),)
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=new_id)
+    team_id: Mapped[str] = mapped_column(ForeignKey("teams.id", ondelete="CASCADE"), nullable=False, index=True)
+    invited_by_user_id: Mapped[str] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+    username: Mapped[str] = mapped_column(String(80), nullable=False, index=True)
+    token_hash: Mapped[str] = mapped_column(String(64), nullable=False)
+    expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    accepted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    team: Mapped[Team] = relationship(back_populates="invites")
 
 
 class Computer(TimestampMixin, Base):

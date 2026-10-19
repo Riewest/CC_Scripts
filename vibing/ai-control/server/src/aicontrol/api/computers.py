@@ -9,6 +9,7 @@ from aicontrol.auth.sessions import SessionPrincipal, require_api_access
 from aicontrol.db.models import Computer, ComputerStatus, ExecRun, User, new_id, utc_now
 from aicontrol.db.session import get_session
 from aicontrol.gateway.registry import GatewayEvent, WebSocketGateway
+from aicontrol.permissions import PermissionRole, accessible_computers, require_computer_role
 from aicontrol.protocol.models import ExecMessage, ExecResultMessage, InterruptMessage
 
 router = APIRouter(prefix="/api/computers", tags=["computers"])
@@ -27,6 +28,8 @@ def _computer_payload(computer: Computer) -> dict[str, Any]:
         "cc_version": computer.cc_version,
         "last_seen": computer.last_seen.isoformat() if computer.last_seen else None,
         "telemetry": computer.telemetry,
+        "owner_team_id": computer.owner_team_id,
+        "ownership": "team" if computer.owner_team_id else "personal",
     }
 
 
@@ -46,10 +49,9 @@ async def _owned_computer(
     computer_id: str,
     user: User,
     session: AsyncSession,
+    required: PermissionRole = PermissionRole.OWNER,
 ) -> Computer:
-    computer = await session.get(Computer, computer_id)
-    if computer is None or computer.owner_user_id != user.id:
-        raise HTTPException(status_code=404, detail="Computer not found")
+    computer, _ = await require_computer_role(user, computer_id, session, required)
     return computer
 
 
@@ -62,12 +64,9 @@ async def list_computers(
     principal: Annotated[SessionPrincipal, Depends(require_api_access("computers:read"))],
     session: Annotated[AsyncSession, Depends(get_session)],
 ) -> list[dict[str, Any]]:
-    computers = await session.scalars(
-        select(Computer)
-        .where(Computer.owner_user_id == principal.user.id)
-        .order_by(Computer.kind, Computer.label)
-    )
-    result = list(computers)
+    accessible = await accessible_computers(principal.user, session)
+    result = [computer for computer, _ in accessible]
+    result.sort(key=lambda computer: (str(computer.kind), computer.label))
     if principal.is_api_token and (
         principal.session.computer_ids is not None or principal.session.group_ids is not None
     ):
@@ -91,7 +90,9 @@ async def get_computer(
     principal: Annotated[SessionPrincipal, Depends(require_api_access("computers:read"))],
     session: Annotated[AsyncSession, Depends(get_session)],
 ) -> dict[str, Any]:
-    computer = await _owned_computer(computer_id, principal.user, session)
+    computer = await _owned_computer(
+        computer_id, principal.user, session, PermissionRole.VIEWER
+    )
     return _computer_payload(computer)
 
 
@@ -114,7 +115,7 @@ async def list_runs(
     principal: Annotated[SessionPrincipal, Depends(require_api_access("computers:read"))],
     session: Annotated[AsyncSession, Depends(get_session)],
 ) -> list[dict[str, Any]]:
-    await _owned_computer(computer_id, principal.user, session)
+    await _owned_computer(computer_id, principal.user, session, PermissionRole.VIEWER)
     runs = await session.scalars(
         select(ExecRun)
         .where(ExecRun.computer_id == computer_id)
@@ -133,7 +134,7 @@ async def execute_code(
     gateway: Annotated[WebSocketGateway, Depends(current_gateway)],
 ) -> dict[str, Any]:
     user = principal.user
-    computer = await _owned_computer(computer_id, user, session)
+    computer = await _owned_computer(computer_id, user, session, PermissionRole.OPERATOR)
     if computer.status != ComputerStatus.ONLINE:
         raise HTTPException(status_code=409, detail="Computer is offline")
     run = ExecRun(
@@ -195,7 +196,7 @@ async def interrupt_program(
     gateway: Annotated[WebSocketGateway, Depends(current_gateway)],
     payload: InterruptRequest | None = None,
 ) -> dict[str, str]:
-    await _owned_computer(computer_id, principal.user, session)
+    await _owned_computer(computer_id, principal.user, session, PermissionRole.OPERATOR)
     try:
         await gateway.registry.interrupt(
             computer_id,
@@ -217,7 +218,7 @@ async def emergency_stop(
     session: Annotated[AsyncSession, Depends(get_session)],
     gateway: Annotated[WebSocketGateway, Depends(current_gateway)],
 ) -> dict[str, str]:
-    await _owned_computer(computer_id, principal.user, session)
+    await _owned_computer(computer_id, principal.user, session, PermissionRole.OPERATOR)
     try:
         await gateway.registry.interrupt(
             computer_id,

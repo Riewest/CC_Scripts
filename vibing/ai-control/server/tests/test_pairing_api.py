@@ -104,12 +104,12 @@ def test_pairing_code_api_requires_login_csrf_and_personal_owner(pairing_client)
 
     no_csrf = pairing_client.post("/api/pairing-codes", json={"owner": "me"})
     assert no_csrf.status_code == 403
-    team_owner = pairing_client.post(
+    unknown_team = pairing_client.post(
         "/api/pairing-codes",
         headers={"x-csrf-token": csrf},
         json={"owner": "team-123"},
     )
-    assert team_owner.status_code == 403
+    assert unknown_team.status_code == 404
 
 
 def test_pairing_creation_is_rate_limited(pairing_client, monkeypatch) -> None:

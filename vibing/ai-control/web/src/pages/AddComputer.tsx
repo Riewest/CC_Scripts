@@ -12,6 +12,7 @@ type PairingState = {
   used: boolean
   paired_computer: { id: string; label: string; kind: string; status: string } | null
 }
+type Team = { id: string; name: string; role: 'owner' | 'member' }
 
 function csrfToken(): string {
   return document.cookie
@@ -26,7 +27,7 @@ async function api<T>(path: string, init: RequestInit = {}): Promise<T> {
     credentials: 'include',
     headers: {
       ...(init.body ? { 'Content-Type': 'application/json' } : {}),
-      ...(init.method && init.method !== 'GET' ? { 'X-CSRF-Token': csrfToken() } : {}),
+      'X-CSRF-Token': csrfToken(),
       ...init.headers,
     },
   })
@@ -47,12 +48,19 @@ export function AddComputer({
   repairLabel?: string
 }) {
   const [label, setLabel] = useState('')
+  const [teams, setTeams] = useState<Team[]>([])
+  const [owner, setOwner] = useState('me')
   const [pairing, setPairing] = useState<PairingCode | null>(null)
   const [pairingUsed, setPairingUsed] = useState(false)
   const [paired, setPaired] = useState<PairingState['paired_computer']>(null)
   const [error, setError] = useState('')
   const [secondsLeft, setSecondsLeft] = useState(0)
   const expiresAt = useMemo(() => pairing ? Date.parse(pairing.expires_at) : 0, [pairing])
+
+  useEffect(() => {
+    if (repairComputerId) return
+    api<Team[]>('/api/teams').then(setTeams).catch(() => setTeams([]))
+  }, [repairComputerId])
 
   useEffect(() => {
     if (!pairing || paired?.status === 'online') return
@@ -97,7 +105,7 @@ export function AddComputer({
         : '/api/pairing-codes'
       const created = await api<PairingCode>(endpoint, {
         method: 'POST',
-        ...(repairComputerId ? {} : { body: JSON.stringify({ owner: 'me', label: label.trim() || null }) }),
+        ...(repairComputerId ? {} : { body: JSON.stringify({ owner, label: label.trim() || null }) }),
       })
       setPairing(created)
     } catch (reason) {
@@ -125,7 +133,8 @@ export function AddComputer({
         <div className="pairing-card">
           {!repairComputerId && <><label className="field-label" htmlFor="device-label">Device label <span>OPTIONAL</span></label>
           <input id="device-label" value={label} onChange={(event) => setLabel(event.target.value)} maxLength={120} placeholder="e.g. Quarry turtle" /></>}
-          <div className="owner-note"><span className="owner-icon">◈</span><span>Personal device <small>Owned by your account</small></span><span className="owner-badge">YOU</span></div>
+          {teams.length > 0 && <><label className="field-label" htmlFor="device-owner">DEVICE OWNER</label><select id="device-owner" className="owner-select" value={owner} onChange={(event) => setOwner(event.target.value)}><option value="me">Personal · your account</option>{teams.map((team) => <option value={team.id} key={team.id}>{team.name} · {team.role}</option>)}</select></>}
+          <div className="owner-note"><span className="owner-icon">◈</span><span>{owner === 'me' ? 'Personal device' : `Team device · ${teams.find((team) => team.id === owner)?.name ?? 'team'}`} <small>{owner === 'me' ? 'Owned by your account' : 'Owned by the team; accessible to team members'}</small></span><span className="owner-badge">{owner === 'me' ? 'YOU' : 'TEAM'}</span></div>
           {error && <p className="error-banner">{error}</p>}
           <button className="primary-button" onClick={() => void generate()}>Generate pairing command <span>↗</span></button>
         </div>

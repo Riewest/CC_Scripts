@@ -177,3 +177,21 @@ footer b { color: var(--green); font-weight: 400; }
 .token-once .secondary-button { justify-self: start; }
 .token-list { display: grid; gap: 9px; margin-top: 30px; }
 .token-list > .field-label { margin: 0; }
+.owner-select { width: 100%; border: 1px solid #ffffff24; border-radius: 8px; background: #0c110e; color: #f1f4f0; padding: 12px 14px; }
+.team-create { display: grid; gap: 10px; }
+.team-create input, .team-create select, .team-controls input { width: 100%; border: 1px solid #ffffff24; border-radius: 7px; background: #0c110e; color: #f1f4f0; padding: 11px; }
+.team-create .field-label { margin: 4px 0 0; }
+.team-section { display: grid; gap: 10px; margin-top: 30px; }
+.team-section > .field-label { margin: 0; }
+.team-card { border: 1px solid #ffffff18; border-radius: 11px; background: #ffffff05; padding: 18px; }
+.team-heading { display: flex; justify-content: space-between; align-items: center; }
+.team-heading h2 { margin: 0; font-size: 18px; font-weight: 500; }
+.team-heading small, .member-row small { display: block; margin-top: 5px; color: var(--muted); font-size: 10px; }
+.team-controls { display: flex; align-items: end; gap: 10px; margin: 18px 0; flex-wrap: wrap; }
+.team-controls .admin-field { min-width: 160px; flex: 1; }
+.member-list { margin-top: 12px; border-top: 1px solid #ffffff12; }
+.member-row { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 10px 0; border-bottom: 1px solid #ffffff0d; color: #e5eae2; font-size: 12px; }
+.member-row > div { display: flex; align-items: center; gap: 8px; }
+.member-row .secondary-button { padding: 6px 8px; font-size: 10px; }
+.team-action { width: auto; padding: 9px 12px; }
+.team-leave { margin: 12px 0 0 auto; }

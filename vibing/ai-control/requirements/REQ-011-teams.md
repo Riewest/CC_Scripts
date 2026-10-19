@@ -1,5 +1,5 @@
 # REQ-011 Teams
-Status: todo | Milestone: M2 | Depends: REQ-006, REQ-007
+Status: done | Milestone: M2 | Depends: REQ-006, REQ-007
 
 ## Goal
 Teams own computers; every team member sees all team computers. Registration supports registering a computer to a team.
@@ -11,10 +11,10 @@ Teams own computers; every team member sees all team computers. Registration sup
 - Central permission function `effective_role(user, computer)` combines: direct owner, team membership, shares, group shares (REQ-012). Put it in one module with exhaustive tests; all endpoints use it.
 
 ## Acceptance criteria
-- [ ] Create team, invite, accept, remove member, leave, transfer ownership.
-- [ ] Team members see team computers on the dashboard with a team badge.
-- [ ] Registration wizard can target a team the user belongs to; others rejected.
-- [ ] `effective_role` unit-tested for all combinations.
+- [x] Create team, invite existing users with hashed/expiring invite links, accept, remove member, leave, transfer ownership, protect the last owner, and explicitly delete empty teams.
+- [x] Team members see team computers on the dashboard with a team badge.
+- [x] Registration wizard can target a team the user belongs to; unknown or nonmember team IDs are rejected.
+- [x] `effective_role` is centralized and unit-tested across personal owner, team owner/member, configurable viewer/operator defaults, direct share, group share, multiple grants and disabled user cases.
 
 ## Test plan
 pytest: team lifecycle, last-owner protection, permission matrix, registration to team.

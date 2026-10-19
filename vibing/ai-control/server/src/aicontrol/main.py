@@ -16,6 +16,7 @@ from aicontrol.config import Settings, get_settings
 from aicontrol.gateway.registry import WebSocketGateway
 from aicontrol.gateway.router import router as gateway_router
 from aicontrol.pairing.routes import router as pairing_router
+from aicontrol.teams import router as teams_router
 
 
 def _find_web_dist(settings: Settings) -> Path | None:
@@ -40,6 +41,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.include_router(auth_router)
     app.include_router(oidc_router)
     app.include_router(tokens_router)
+    app.include_router(teams_router)
     app.include_router(admin_router)
     app.include_router(auth_websocket_router)
     app.include_router(client_router)

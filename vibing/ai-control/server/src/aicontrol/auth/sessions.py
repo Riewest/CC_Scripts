@@ -197,18 +197,19 @@ async def authorize_api_request(
         computer_ids = principal.session.computer_ids
         group_ids = principal.session.group_ids
         if computer_ids is not None or group_ids is not None:
+            allowed_by_group = False
             if computer_id not in (computer_ids or []):
-                if not group_ids:
-                    raise HTTPException(status_code=403, detail="API token is not scoped to this computer")
-                from aicontrol.db.models import GroupMember
+                if group_ids:
+                    from aicontrol.db.models import GroupMember
 
-                membership = await session.scalar(
-                    select(GroupMember.id).where(
-                        GroupMember.computer_id == computer_id,
-                        GroupMember.group_id.in_(group_ids),
-                    ).limit(1)
-                )
-                if membership is None:
+                    membership = await session.scalar(
+                        select(GroupMember.id).where(
+                            GroupMember.computer_id == computer_id,
+                            GroupMember.group_id.in_(group_ids),
+                        ).limit(1)
+                    )
+                    allowed_by_group = membership is not None
+                if not allowed_by_group:
                     raise HTTPException(status_code=403, detail="API token is not scoped to this computer")
     return principal
 

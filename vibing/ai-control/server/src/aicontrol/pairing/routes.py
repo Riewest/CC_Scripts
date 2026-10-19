@@ -4,10 +4,11 @@ from typing import Annotated
 from urllib.parse import urlsplit
 
 from fastapi import APIRouter, Depends, HTTPException, Request, status
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from aicontrol.auth.sessions import SessionPrincipal, current_session, require_csrf
-from aicontrol.db.models import Computer, PairingCode, utc_now
+from aicontrol.db.models import Computer, PairingCode, Team, TeamMember, utc_now
 from aicontrol.db.security import hash_pairing_code
 from aicontrol.db.session import get_session
 from aicontrol.pairing.rate_limit import pairing_creation_limiter
@@ -16,6 +17,7 @@ from aicontrol.pairing.schemas import (
     PairingCodeResponse,
     PairingStatusResponse,
 )
+from aicontrol.permissions import PermissionRole, require_computer_role
 
 router = APIRouter(prefix="/api", tags=["pairing"])
 PAIRING_ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"
@@ -97,16 +99,25 @@ async def create_pairing_code(
             detail="Too many pairing codes requested; try again later",
             headers={"Retry-After": "900"},
         )
+    owner_user_id = principal.user.id
+    owner_team_id = None
     if payload.owner != "me":
-        raise HTTPException(
-            status_code=403,
-            detail="Team pairing is unavailable until team membership permissions are implemented",
+        team = await session.get(Team, payload.owner)
+        membership = await session.scalar(
+            select(TeamMember).where(
+                TeamMember.team_id == payload.owner,
+                TeamMember.user_id == principal.user.id,
+            )
         )
+        if team is None or membership is None:
+            raise HTTPException(status_code=404, detail="Team not found")
+        owner_user_id = None
+        owner_team_id = team.id
     pairing_creation_limiter.record(limiter_key)
     pairing, plaintext = await _insert_code(
         session,
-        owner_user_id=principal.user.id,
-        owner_team_id=None,
+        owner_user_id=owner_user_id,
+        owner_team_id=owner_team_id,
         target_computer_id=None,
         label=payload.label,
     )
@@ -124,14 +135,9 @@ async def create_repair_code(
     principal: Annotated[SessionPrincipal, Depends(require_csrf)],
     session: Annotated[AsyncSession, Depends(get_session)],
 ) -> PairingCodeResponse:
-    computer = await session.get(Computer, computer_id)
-    if computer is None or computer.owner_user_id != principal.user.id:
-        raise HTTPException(status_code=404, detail="Computer not found")
-    if computer.owner_team_id is not None:
-        raise HTTPException(
-            status_code=403,
-            detail="Team-owned computer re-pairing is unavailable until team permissions are implemented",
-        )
+    computer, _ = await require_computer_role(
+        principal.user, computer_id, session, PermissionRole.OWNER
+    )
     client_host = request.client.host if request.client else "unknown"
     limiter_key = f"create:{principal.user.id}:{client_host}"
     if pairing_creation_limiter.limited(limiter_key):
@@ -163,11 +169,21 @@ async def pairing_status(
     if principal.is_api_token:
         raise HTTPException(status_code=403, detail="Browser session required")
     if pairing.owner_user_id != principal.user.id:
-        if pairing.target_computer_id is None:
-            raise HTTPException(status_code=404, detail="Pairing request not found")
-        computer = await session.get(Computer, pairing.target_computer_id)
-        if computer is None or computer.owner_user_id != principal.user.id:
-            raise HTTPException(status_code=404, detail="Pairing request not found")
+        if pairing.owner_team_id is not None:
+            membership = await session.scalar(
+                select(TeamMember.id).where(
+                    TeamMember.team_id == pairing.owner_team_id,
+                    TeamMember.user_id == principal.user.id,
+                )
+            )
+            if membership is None:
+                raise HTTPException(status_code=404, detail="Pairing request not found")
+        else:
+            if pairing.target_computer_id is None:
+                raise HTTPException(status_code=404, detail="Pairing request not found")
+            computer = await session.get(Computer, pairing.target_computer_id)
+            if computer is None or computer.owner_user_id != principal.user.id:
+                raise HTTPException(status_code=404, detail="Pairing request not found")
     computer = (
         await session.get(Computer, pairing.paired_computer_id)
         if pairing.paired_computer_id
