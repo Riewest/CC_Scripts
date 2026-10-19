@@ -2,12 +2,17 @@ from __future__ import annotations
 
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import BaseModel
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from aicontrol.auth.sessions import SessionPrincipal, current_user, require_csrf
+from aicontrol.auth.sessions import (
+    SessionPrincipal,
+    authorize_api_request,
+    current_session,
+    require_csrf,
+)
 from aicontrol.db.models import ApiToken, User, UserRole
 from aicontrol.db.session import get_session
 
@@ -19,10 +24,15 @@ class UserUpdate(BaseModel):
     disabled: bool | None = None
 
 
-async def admin_user(user: Annotated[User, Depends(current_user)]) -> User:
-    if user.role != UserRole.ADMIN:
+async def admin_user(
+    request: Request,
+    principal: Annotated[SessionPrincipal, Depends(current_session)],
+    session: Annotated[AsyncSession, Depends(get_session)],
+) -> User:
+    await authorize_api_request(request, principal, session, scope="admin")
+    if principal.user.role != UserRole.ADMIN:
         raise HTTPException(status_code=403, detail="Administrator access required")
-    return user
+    return principal.user
 
 
 @router.get("/users")

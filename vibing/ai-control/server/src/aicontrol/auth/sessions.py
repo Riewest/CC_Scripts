@@ -17,13 +17,16 @@ from aicontrol.db.session import get_session
 SESSION_COOKIE = "aic_session"
 CSRF_COOKIE = "aic_csrf"
 SESSION_LABEL_PREFIX = "web-session:"
+API_TOKEN_LABEL_PREFIX = "aic-token:"
 SESSION_LIFETIME = timedelta(hours=12)
+API_TOKEN_SCOPES = {"computers:read", "computers:exec", "scripts:rw", "ai:use", "admin"}
 
 
 @dataclass(frozen=True)
 class SessionPrincipal:
     user: User
     session: ApiToken
+    is_api_token: bool = False
 
 
 def token_digest(token: str) -> str:
@@ -80,14 +83,65 @@ async def lookup_session(token: str | None, session: AsyncSession) -> SessionPri
     return SessionPrincipal(user, record)
 
 
+async def lookup_api_token(
+    token: str | None, session: AsyncSession, *, remote_ip: str | None = None
+) -> SessionPrincipal | None:
+    if not token or not token.startswith("aic_") or len(token) > 128:
+        return None
+    record = await session.scalar(
+        select(ApiToken).where(
+            ApiToken.token_hash == token_digest(token),
+            ApiToken.label.like(f"{API_TOKEN_LABEL_PREFIX}%"),
+            (ApiToken.expires_at.is_(None)) | (ApiToken.expires_at > utc_now()),
+        )
+    )
+    if record is None:
+        return None
+    user = await session.get(User, record.user_id)
+    if user is None or user.disabled:
+        return None
+    record.last_used_at = utc_now()
+    record.last_used_ip = remote_ip
+    await session.commit()
+    return SessionPrincipal(user, record, is_api_token=True)
+
+
 async def current_session(
     request: Request,
     session: Annotated[AsyncSession, Depends(get_session)],
 ) -> SessionPrincipal:
+    authorization = request.headers.get("authorization", "")
+    if authorization:
+        scheme, _, credential = authorization.partition(" ")
+        if scheme.casefold() != "bearer" or not credential or " " in credential:
+            raise HTTPException(status_code=401, detail="Authentication required")
+        remote_ip = request.client.host if request.client else None
+        principal = await lookup_api_token(credential, session, remote_ip=remote_ip)
+        if principal is None:
+            raise HTTPException(status_code=401, detail="Authentication required")
+        request.state.principal = principal
+        return principal
     principal = await lookup_session(request.cookies.get(SESSION_COOKIE), session)
     if principal is None:
         raise HTTPException(status_code=401, detail="Authentication required")
     return principal
+
+
+def require_api_access(scope: str):
+    async def dependency(
+        request: Request,
+        principal: Annotated[SessionPrincipal, Depends(current_session)],
+        session: Annotated[AsyncSession, Depends(get_session)],
+    ) -> SessionPrincipal:
+        return await authorize_api_request(
+            request,
+            principal,
+            session,
+            scope=scope,
+            computer_id=request.path_params.get("computer_id"),
+        )
+
+    return dependency
 
 
 async def current_user(principal: Annotated[SessionPrincipal, Depends(current_session)]) -> User:
@@ -98,6 +152,8 @@ async def require_csrf(
     request: Request,
     principal: Annotated[SessionPrincipal, Depends(current_session)],
 ) -> SessionPrincipal:
+    if principal.is_api_token:
+        raise HTTPException(status_code=403, detail="Browser session required")
     csrf_cookie = request.cookies.get(CSRF_COOKIE)
     csrf_header = request.headers.get("x-csrf-token")
     stored_digest = principal.session.label.removeprefix(SESSION_LABEL_PREFIX)
@@ -108,6 +164,52 @@ async def require_csrf(
         or not secrets.compare_digest(token_digest(csrf_cookie), stored_digest)
     ):
         raise HTTPException(status_code=403, detail="CSRF validation failed")
+    return principal
+
+
+async def authorize_api_request(
+    request: Request,
+    principal: SessionPrincipal,
+    session: AsyncSession,
+    *,
+    scope: str,
+    computer_id: str | None = None,
+) -> SessionPrincipal:
+    if not principal.is_api_token:
+        if request.method not in {"GET", "HEAD", "OPTIONS"}:
+            csrf_cookie = request.cookies.get(CSRF_COOKIE)
+            csrf_header = request.headers.get("x-csrf-token")
+            stored_digest = principal.session.label.removeprefix(SESSION_LABEL_PREFIX)
+            if (
+                not csrf_cookie
+                or not csrf_header
+                or not secrets.compare_digest(csrf_cookie, csrf_header)
+                or not secrets.compare_digest(token_digest(csrf_cookie), stored_digest)
+            ):
+                raise HTTPException(status_code=403, detail="CSRF validation failed")
+        return principal
+    granted = set(principal.session.scopes or [])
+    if scope not in granted:
+        raise HTTPException(status_code=403, detail="API token scope is insufficient")
+    if scope == "admin" and principal.user.role.value != "admin":
+        raise HTTPException(status_code=403, detail="Administrator access required")
+    if computer_id is not None:
+        computer_ids = principal.session.computer_ids
+        group_ids = principal.session.group_ids
+        if computer_ids is not None or group_ids is not None:
+            if computer_id not in (computer_ids or []):
+                if not group_ids:
+                    raise HTTPException(status_code=403, detail="API token is not scoped to this computer")
+                from aicontrol.db.models import GroupMember
+
+                membership = await session.scalar(
+                    select(GroupMember.id).where(
+                        GroupMember.computer_id == computer_id,
+                        GroupMember.group_id.in_(group_ids),
+                    ).limit(1)
+                )
+                if membership is None:
+                    raise HTTPException(status_code=403, detail="API token is not scoped to this computer")
     return principal
 
 

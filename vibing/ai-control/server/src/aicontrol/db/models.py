@@ -274,6 +274,11 @@ class ApiToken(TimestampMixin, Base):
     label: Mapped[str] = mapped_column(String(120), nullable=False)
     expires_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     last_used_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    last_used_ip: Mapped[str | None] = mapped_column(String(64))
+    token_prefix: Mapped[str | None] = mapped_column(String(16))
+    scopes: Mapped[list[str] | None] = mapped_column(JSON)
+    computer_ids: Mapped[list[str] | None] = mapped_column(JSON)
+    group_ids: Mapped[list[str] | None] = mapped_column(JSON)
     user: Mapped[User] = relationship(back_populates="api_tokens")
 
 

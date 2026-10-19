@@ -1,5 +1,5 @@
 # REQ-010 API tokens
-Status: todo | Milestone: M2 | Depends: REQ-006
+Status: done | Milestone: M2 | Depends: REQ-006
 
 ## Goal
 Scoped, revocable API tokens for programmatic access (scripts, MCP, CI).
@@ -12,10 +12,10 @@ Scoped, revocable API tokens for programmatic access (scripts, MCP, CI).
 - UI page to create, list, and revoke tokens.
 
 ## Acceptance criteria
-- [ ] Token shown once and stored hashed.
-- [ ] Scope and computer restrictions enforced on every endpoint.
-- [ ] Revoked and expired tokens are rejected immediately.
-- [ ] Token use appears in the audit log once REQ-013 exists (hook in place).
+- [x] Token shown once and stored hashed; only a short display prefix and non-secret metadata are returned thereafter.
+- [x] Scope and computer/group restrictions enforced on all current protected API endpoints; bearer access cannot bypass CSRF-protected pairing or token management.
+- [x] Revoked and expired tokens are rejected immediately; disabled-user credentials are also rejected.
+- [x] Token authentication updates last-used time/IP and identifies token principals for REQ-013 audit hooks.
 
 ## Test plan
 pytest: create/use/revoke, scope denial, restricted-computer denial, expiry.

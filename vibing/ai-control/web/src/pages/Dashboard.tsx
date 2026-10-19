@@ -74,12 +74,14 @@ export function Dashboard({
   onRepairComputer,
   onLogout,
   onAdmin,
+  onTokens,
   isAdmin,
 }: {
   onAddComputer: () => void
   onRepairComputer: (computer: Pick<Computer, 'id' | 'label'>) => void
   onLogout: () => void
   onAdmin: () => void
+  onTokens: () => void
   isAdmin: boolean
 }) {
   const [computers, setComputers] = useState<Computer[]>([])
@@ -229,7 +231,7 @@ export function Dashboard({
       <header className="topbar">
         <a className="brand" href="#" onClick={(event) => event.preventDefault()}><span className="brand-mark">⌘</span><span>AI Control</span></a>
         <span className={`connection ${websocketState === 'live' ? '' : 'dimmed'}`}><i /> {websocketState === 'live' ? 'Live connection' : websocketState}</span>
-        <div className="topbar-actions">{isAdmin && <button className="text-button" onClick={onAdmin}>Admin</button>}{oidcProviders.map((provider) => <button className="text-button" key={provider} onClick={() => void linkIdentity(provider)}>Link {provider}</button>)}<button className="nav-action" onClick={onAddComputer}>＋ Add computer</button><button className="text-button" onClick={() => void logout()}>Sign out</button></div>
+        <div className="topbar-actions">{isAdmin && <button className="text-button" onClick={onAdmin}>Admin</button>}<button className="text-button" onClick={onTokens}>API tokens</button>{oidcProviders.map((provider) => <button className="text-button" key={provider} onClick={() => void linkIdentity(provider)}>Link {provider}</button>)}<button className="nav-action" onClick={onAddComputer}>＋ Add computer</button><button className="text-button" onClick={() => void logout()}>Sign out</button></div>
       </header>
       <main className="dashboard-content">
         <div className="dashboard-heading"><div><p className="eyebrow">YOUR CONTROL ROOM</p><h1 className="dashboard-title">Computer fleet</h1><p className="intro dashboard-intro">Devices connected to your account, ready when you are.</p></div><div className="fleet-count"><strong>{onlineCount}</strong><span>ONLINE <b>·</b> {computers.length} TOTAL</span></div></div>

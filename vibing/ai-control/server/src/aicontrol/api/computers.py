@@ -5,7 +5,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from aicontrol.api.computer_schemas import ExecRequest, InterruptRequest, RenameComputerRequest
-from aicontrol.auth.sessions import SessionPrincipal, current_user, require_csrf
+from aicontrol.auth.sessions import SessionPrincipal, require_api_access
 from aicontrol.db.models import Computer, ComputerStatus, ExecRun, User, new_id, utc_now
 from aicontrol.db.session import get_session
 from aicontrol.gateway.registry import GatewayEvent, WebSocketGateway
@@ -59,24 +59,39 @@ async def current_gateway(request: Request) -> WebSocketGateway:
 
 @router.get("")
 async def list_computers(
-    user: Annotated[User, Depends(current_user)],
+    principal: Annotated[SessionPrincipal, Depends(require_api_access("computers:read"))],
     session: Annotated[AsyncSession, Depends(get_session)],
 ) -> list[dict[str, Any]]:
     computers = await session.scalars(
         select(Computer)
-        .where(Computer.owner_user_id == user.id)
+        .where(Computer.owner_user_id == principal.user.id)
         .order_by(Computer.kind, Computer.label)
     )
-    return [_computer_payload(computer) for computer in computers]
+    result = list(computers)
+    if principal.is_api_token and (
+        principal.session.computer_ids is not None or principal.session.group_ids is not None
+    ):
+        allowed_ids = set(principal.session.computer_ids or [])
+        if principal.session.group_ids:
+            from aicontrol.db.models import GroupMember
+
+            group_computer_ids = await session.scalars(
+                select(GroupMember.computer_id).where(
+                    GroupMember.group_id.in_(principal.session.group_ids)
+                )
+            )
+            allowed_ids.update(group_computer_ids)
+        result = [computer for computer in result if computer.id in allowed_ids]
+    return [_computer_payload(computer) for computer in result]
 
 
 @router.get("/{computer_id}")
 async def get_computer(
     computer_id: str,
-    user: Annotated[User, Depends(current_user)],
+    principal: Annotated[SessionPrincipal, Depends(require_api_access("computers:read"))],
     session: Annotated[AsyncSession, Depends(get_session)],
 ) -> dict[str, Any]:
-    computer = await _owned_computer(computer_id, user, session)
+    computer = await _owned_computer(computer_id, principal.user, session)
     return _computer_payload(computer)
 
 
@@ -84,7 +99,7 @@ async def get_computer(
 async def rename_computer(
     computer_id: str,
     payload: RenameComputerRequest,
-    principal: Annotated[SessionPrincipal, Depends(require_csrf)],
+    principal: Annotated[SessionPrincipal, Depends(require_api_access("computers:exec"))],
     session: Annotated[AsyncSession, Depends(get_session)],
 ) -> dict[str, Any]:
     computer = await _owned_computer(computer_id, principal.user, session)
@@ -96,10 +111,10 @@ async def rename_computer(
 @router.get("/{computer_id}/runs")
 async def list_runs(
     computer_id: str,
-    user: Annotated[User, Depends(current_user)],
+    principal: Annotated[SessionPrincipal, Depends(require_api_access("computers:read"))],
     session: Annotated[AsyncSession, Depends(get_session)],
 ) -> list[dict[str, Any]]:
-    await _owned_computer(computer_id, user, session)
+    await _owned_computer(computer_id, principal.user, session)
     runs = await session.scalars(
         select(ExecRun)
         .where(ExecRun.computer_id == computer_id)
@@ -113,7 +128,7 @@ async def list_runs(
 async def execute_code(
     computer_id: str,
     payload: ExecRequest,
-    principal: Annotated[SessionPrincipal, Depends(require_csrf)],
+    principal: Annotated[SessionPrincipal, Depends(require_api_access("computers:exec"))],
     session: Annotated[AsyncSession, Depends(get_session)],
     gateway: Annotated[WebSocketGateway, Depends(current_gateway)],
 ) -> dict[str, Any]:
@@ -175,7 +190,7 @@ async def execute_code(
 @router.post("/{computer_id}/interrupt", status_code=status.HTTP_202_ACCEPTED)
 async def interrupt_program(
     computer_id: str,
-    principal: Annotated[SessionPrincipal, Depends(require_csrf)],
+    principal: Annotated[SessionPrincipal, Depends(require_api_access("computers:exec"))],
     session: Annotated[AsyncSession, Depends(get_session)],
     gateway: Annotated[WebSocketGateway, Depends(current_gateway)],
     payload: InterruptRequest | None = None,
@@ -198,7 +213,7 @@ async def interrupt_program(
 @router.post("/{computer_id}/emergency-stop", status_code=status.HTTP_202_ACCEPTED)
 async def emergency_stop(
     computer_id: str,
-    principal: Annotated[SessionPrincipal, Depends(require_csrf)],
+    principal: Annotated[SessionPrincipal, Depends(require_api_access("computers:exec"))],
     session: Annotated[AsyncSession, Depends(get_session)],
     gateway: Annotated[WebSocketGateway, Depends(current_gateway)],
 ) -> dict[str, str]:
@@ -220,7 +235,7 @@ async def emergency_stop(
 @router.post("/{computer_id}/reboot", status_code=status.HTTP_202_ACCEPTED)
 async def reboot_computer(
     computer_id: str,
-    principal: Annotated[SessionPrincipal, Depends(require_csrf)],
+    principal: Annotated[SessionPrincipal, Depends(require_api_access("computers:exec"))],
     session: Annotated[AsyncSession, Depends(get_session)],
     gateway: Annotated[WebSocketGateway, Depends(current_gateway)],
 ) -> dict[str, str]:

@@ -60,7 +60,7 @@ vibing/ai-control/
 | ID | Title | Depends | Status |
 |---|---|---|---|
 | [REQ-009](requirements/REQ-009-oidc-roles.md) | OIDC login and roles | 006 | done |
-| [REQ-010](requirements/REQ-010-api-tokens.md) | API tokens | 006 | todo |
+| [REQ-010](requirements/REQ-010-api-tokens.md) | API tokens | 006 | done |
 | [REQ-011](requirements/REQ-011-teams.md) | Teams | 006, 007 | todo |
 | [REQ-012](requirements/REQ-012-groups-sharing.md) | Groups and sharing | 011 | todo |
 | [REQ-013](requirements/REQ-013-audit-log.md) | Audit log | 008 | todo |

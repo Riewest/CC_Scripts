@@ -160,6 +160,8 @@ async def pairing_status(
     pairing = await session.get(PairingCode, pairing_id)
     if pairing is None:
         raise HTTPException(status_code=404, detail="Pairing request not found")
+    if principal.is_api_token:
+        raise HTTPException(status_code=403, detail="Browser session required")
     if pairing.owner_user_id != principal.user.id:
         if pairing.target_computer_id is None:
             raise HTTPException(status_code=404, detail="Pairing request not found")

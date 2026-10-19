@@ -9,6 +9,7 @@ from aicontrol.api.computers import router as computers_router
 from aicontrol.auth.admin import router as admin_router
 from aicontrol.auth.oidc import router as oidc_router
 from aicontrol.auth.routes import router as auth_router
+from aicontrol.auth.tokens import router as tokens_router
 from aicontrol.auth.websocket import router as auth_websocket_router
 from aicontrol.client_files import router as client_router
 from aicontrol.config import Settings, get_settings
@@ -38,6 +39,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.include_router(gateway_router)
     app.include_router(auth_router)
     app.include_router(oidc_router)
+    app.include_router(tokens_router)
     app.include_router(admin_router)
     app.include_router(auth_websocket_router)
     app.include_router(client_router)
