@@ -11,6 +11,7 @@ from aicontrol.client_files import router as client_router
 from aicontrol.config import Settings, get_settings
 from aicontrol.gateway.registry import WebSocketGateway
 from aicontrol.gateway.router import router as gateway_router
+from aicontrol.pairing.routes import router as pairing_router
 
 
 def _find_web_dist(settings: Settings) -> Path | None:
@@ -35,6 +36,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.include_router(auth_router)
     app.include_router(auth_websocket_router)
     app.include_router(client_router)
+    app.include_router(pairing_router)
     web_dist = _find_web_dist(app_settings)
 
     @app.get("/api/health", tags=["health"])

@@ -15,6 +15,6 @@ COPY server/src ./server/src
 COPY client/ ./server/src/aicontrol/client_dist/
 RUN pip install --no-cache-dir ./server
 COPY --from=web-build /build/web/dist ./server/src/aicontrol/static
-ENV AIC_WEB_DIST_DIR=/app/server/src/aicontrol/static AIC_CLIENT_DIST_DIR=/app/server/src/aicontrol/client_dist
+ENV AIC_WEB_DIST_DIR=/app/server/src/aicontrol/static AIC_CLIENT_DIST_DIR=/app/server/src/aicontrol/client_dist AIC_PUBLIC_URL=http://localhost:8000
 EXPOSE 8000
 CMD ["sh", "-c", "alembic -c /app/server/alembic.ini upgrade head && python -m aicontrol.main"]

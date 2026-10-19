@@ -51,8 +51,8 @@ vibing/ai-control/
 | [REQ-004](requirements/REQ-004-ws-gateway.md) | WebSocket gateway | 002, 003 | done |
 | [REQ-005](requirements/REQ-005-lua-client.md) | Lua client and installer | 003, 004 | blocked |
 | [REQ-006](requirements/REQ-006-local-auth.md) | Local auth and sessions | 002 | done |
-| [REQ-007](requirements/REQ-007-registration-flow.md) | Computer registration flow | 004, 005, 006 | todo |
-| [REQ-008](requirements/REQ-008-mvp-ui.md) | MVP web UI | 006, 007 | todo |
+| [REQ-007](requirements/REQ-007-registration-flow.md) | Computer registration flow | 004, 005, 006 | done |
+| [REQ-008](requirements/REQ-008-mvp-ui.md) | MVP web UI | 006, 007 | in-progress |
 
 **STOP POINT 1 (MVP checklist):** install on a fresh computer via the pasted command; pair with code; see it online; run Lua and see output; trigger an error and see traceback; interrupt a `while true do end` loop; restart the server and see the client reconnect; test on a turtle and a pocket computer.
 

@@ -6,7 +6,7 @@ from typing import Annotated
 
 from anyio import CancelScope
 from fastapi import APIRouter, Depends, WebSocket, WebSocketDisconnect
-from sqlalchemy import select
+from sqlalchemy import select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from aicontrol.db.models import (
@@ -24,6 +24,7 @@ from aicontrol.gateway.registry import (
     GatewayEvent,
     WebSocketGateway,
 )
+from aicontrol.pairing.rate_limit import pairing_exchange_limiter
 from aicontrol.protocol.models import (
     HeartbeatMessage,
     HelloAckMessage,
@@ -75,6 +76,7 @@ async def _authenticate_or_pair(
     session: AsyncSession,
     gateway: WebSocketGateway,
     hello: HelloMessage,
+    peer_key: str,
 ) -> tuple[Computer | None, str | None]:
     computer = await session.get(Computer, hello.data.device_id)
     if computer is not None:
@@ -93,35 +95,85 @@ async def _authenticate_or_pair(
             kind_matches,
             secret_matches,
         )
-        return None, None
+        pairing_target = computer.id
+    else:
+        pairing_target = None
 
+    if pairing_exchange_limiter.limited(peer_key):
+        logger.warning("Pairing exchange rate limit reached for peer %s", peer_key)
+        return None, None
     code_digest = hash_pairing_code(hello.data.secret)
     async with gateway.pairing_lock:
-        pairing_code = await session.scalar(
+        pairing_candidate = await session.scalar(
             select(PairingCode).where(
                 PairingCode.code_hash == code_digest,
                 PairingCode.used_at.is_(None),
                 PairingCode.expires_at > utc_now(),
+                PairingCode.target_computer_id.is_(None)
+                if pairing_target is None
+                else PairingCode.target_computer_id == pairing_target,
             )
         )
-        if pairing_code is None:
+        if pairing_candidate is None:
+            pairing_exchange_limiter.record(peer_key)
             return None, None
-        if (pairing_code.owner_user_id is None) == (pairing_code.owner_team_id is None):
+
+        claimed = await session.execute(
+            update(PairingCode)
+            .where(
+                PairingCode.id == pairing_candidate.id,
+                PairingCode.used_at.is_(None),
+                PairingCode.expires_at > utc_now(),
+            )
+            .values(used_at=utc_now())
+            .execution_options(synchronize_session=False)
+            .returning(
+                PairingCode.owner_user_id,
+                PairingCode.owner_team_id,
+                PairingCode.target_computer_id,
+                PairingCode.label,
+            )
+        )
+        code_details = claimed.one_or_none()
+        if code_details is None:
+            pairing_exchange_limiter.record(peer_key)
             return None, None
 
         device_secret = secrets.token_urlsafe(32)
-        computer = Computer(
-            id=hello.data.device_id,
-            owner_user_id=pairing_code.owner_user_id,
-            owner_team_id=pairing_code.owner_team_id,
-            label=hello.data.label,
-            kind=ComputerKind(hello.data.kind),
-            cc_version=hello.data.cc_version,
-            device_secret_hash=await asyncio.to_thread(hash_secret, device_secret),
+        owner_user_id, owner_team_id, target_computer_id, label = code_details
+        if computer is not None:
+            if target_computer_id != computer.id:
+                await session.rollback()
+                pairing_exchange_limiter.record(peer_key)
+                return None, None
+            computer.device_secret_hash = await asyncio.to_thread(hash_secret, device_secret)
+            computer.kind = ComputerKind(hello.data.kind)
+            computer.cc_version = hello.data.cc_version or computer.cc_version
+            if label:
+                computer.label = label
+        else:
+            if target_computer_id is not None or (owner_user_id is None) == (owner_team_id is None):
+                await session.rollback()
+                pairing_exchange_limiter.record(peer_key)
+                return None, None
+            computer = Computer(
+                id=hello.data.device_id,
+                owner_user_id=owner_user_id,
+                owner_team_id=owner_team_id,
+                label=label or hello.data.label,
+                kind=ComputerKind(hello.data.kind),
+                cc_version=hello.data.cc_version,
+                device_secret_hash=await asyncio.to_thread(hash_secret, device_secret),
+            )
+            session.add(computer)
+        await session.flush()
+        await session.execute(
+            update(PairingCode)
+            .where(PairingCode.id == pairing_candidate.id)
+            .values(paired_computer_id=computer.id)
         )
-        pairing_code.used_at = utc_now()
-        session.add(computer)
         await session.commit()
+        pairing_exchange_limiter.clear(peer_key)
         return computer, device_secret
 
 
@@ -158,6 +210,7 @@ async def computer_websocket(
         session,
         gateway,
         first_message,
+        websocket.client.host if websocket.client else "unknown",
     )
     if computer is None:
         known_device = await session.get(Computer, first_message.data.device_id) is not None
@@ -171,7 +224,8 @@ async def computer_websocket(
 
     if first_message.data.cc_version:
         computer.cc_version = first_message.data.cc_version
-    computer.label = first_message.data.label
+    if issued_device_secret is None:
+        computer.label = first_message.data.label
     await _set_online(session, computer)
     logger.info("Computer %s authenticated; opening gateway session", computer.id)
 
