@@ -48,20 +48,24 @@ export function AddComputer({
 }) {
   const [label, setLabel] = useState('')
   const [pairing, setPairing] = useState<PairingCode | null>(null)
+  const [pairingUsed, setPairingUsed] = useState(false)
   const [paired, setPaired] = useState<PairingState['paired_computer']>(null)
   const [error, setError] = useState('')
   const [secondsLeft, setSecondsLeft] = useState(0)
   const expiresAt = useMemo(() => pairing ? Date.parse(pairing.expires_at) : 0, [pairing])
 
   useEffect(() => {
-    if (!pairing || paired) return
+    if (!pairing || paired?.status === 'online') return
     let cancelled = false
     let timeout: number | undefined
     const poll = async () => {
       if (Date.now() >= Date.parse(pairing.expires_at)) return
       try {
         const state = await api<PairingState>(`/api/pairing-codes/${pairing.id}`)
-        if (!cancelled && state.paired_computer) setPaired(state.paired_computer)
+        if (!cancelled) {
+          setPairingUsed(state.used)
+          if (state.paired_computer) setPaired(state.paired_computer)
+        }
       } catch (reason) {
         if (!cancelled) setError(reason instanceof Error ? reason.message : 'Could not check pairing status')
       } finally {
@@ -76,16 +80,17 @@ export function AddComputer({
   }, [pairing, paired])
 
   useEffect(() => {
-    if (!pairing || paired) return
+    if (!pairing || pairingUsed) return
     const update = () => setSecondsLeft(Math.max(0, Math.ceil((expiresAt - Date.now()) / 1000)))
     update()
     const timer = window.setInterval(update, 1000)
     return () => window.clearInterval(timer)
-  }, [expiresAt, paired, pairing])
+  }, [expiresAt, pairing, pairingUsed])
 
   async function generate() {
     setError('')
     setPaired(null)
+    setPairingUsed(false)
     try {
       const endpoint = repairComputerId
         ? `/api/computers/${repairComputerId}/pairing-code`
@@ -133,7 +138,7 @@ export function AddComputer({
             <>
               <p className="field-label">RUN THIS COMMAND IN YOUR COMPUTERCRAFT SHELL</p>
               <div className="command-box"><code>{pairing.command}</code><button onClick={() => void copyCommand()} aria-label="Copy pairing command">Copy</button></div>
-              <div className="pair-code-row"><span>One-time code</span><code>{pairing.code}</code><span className="countdown">{Math.floor(secondsLeft / 60)}:{String(secondsLeft % 60).padStart(2, '0')} remaining</span></div>
+              {!pairingUsed && <div className="pair-code-row"><span>One-time code</span><code>{pairing.code}</code><span className="countdown">{Math.floor(secondsLeft / 60)}:{String(secondsLeft % 60).padStart(2, '0')} remaining</span></div>}
               {error && <p className="error-banner">{error}</p>}
               {secondsLeft === 0 && <button className="primary-button" onClick={() => void generate()}>Generate a new code <span>↻</span></button>}
             </>

@@ -16,6 +16,7 @@ local nextMessageId = 0
 local activeExecutionId
 local interruptRequested = false
 local pendingInterruptIds = {}
+local pendingExecutions = {}
 
 local function log(message)
     if not fs.exists("/aicontrol") then fs.makeDir("/aicontrol") end
@@ -291,6 +292,23 @@ local function eventReply(messageId, interrupted, explanation)
     }, nextId("interrupt"), messageId))
 end
 
+local function cancelQueuedExecutions(reason)
+    local queued = pendingExecutions
+    pendingExecutions = {}
+    for _, message in ipairs(queued) do
+        sendExecutionResult(
+            message.id,
+            false,
+            {},
+            "",
+            reason,
+            "Execution was cancelled before it started.",
+            0
+        )
+    end
+    return #queued
+end
+
 local function copyTable(source, excluded)
     local result = {}
     for key, value in pairs(source) do
@@ -380,6 +398,7 @@ local function runProgram(message)
     local interrupted = false
     local programError
     local programTraceback
+    local timedOut = false
     local returnValues = {}
     while success and coroutine.status(program) ~= "dead" do
         if interruptRequested then
@@ -387,6 +406,10 @@ local function runProgram(message)
             break
         end
         if packedOrError == HOOK_YIELD then
+            if nowMs() - started >= data.timeout_ms then
+                timedOut = true
+                break
+            end
             os.queueEvent("aicontrol_program_tick")
             os.pullEvent("aicontrol_program_tick")
             resumeArgs = {}
@@ -422,6 +445,9 @@ local function runProgram(message)
     if interrupted then
         programError = "Interrupted"
         programTraceback = "Execution interrupted. An in-flight turtle API call cannot be aborted; interruption takes effect at the next Lua instruction yield."
+    elseif timedOut then
+        programError = "Execution timed out"
+        programTraceback = "Execution exceeded its " .. tostring(data.timeout_ms) .. " ms timeout and was stopped at a Lua instruction yield."
     end
     sendExecutionResult(
         message.id,
@@ -434,8 +460,16 @@ local function runProgram(message)
     )
     activeExecutionId = nil
     interruptRequested = false
-    for _, interruptId in ipairs(pendingInterruptIds) do
-        eventReply(interruptId, interrupted, interrupted and "Program stopped" or "Program had already completed")
+    for _, interrupt in ipairs(pendingInterruptIds) do
+        local explanation
+        if interrupt.emergency then
+            explanation = "Emergency stop halted active execution and cancelled "
+                .. tostring(interrupt.cancelled_count)
+                .. " queued program(s)"
+        else
+            explanation = interrupted and "Program stopped" or "Program had already completed"
+        end
+        eventReply(interrupt.id, interrupted, explanation)
     end
     pendingInterruptIds = {}
 end
@@ -444,11 +478,20 @@ local function handleIncoming(message)
     if message.type == "exec" then
         runProgram(message)
     elseif message.type == "interrupt" then
+        local emergency = message.data and message.data.reason == "emergency"
+        local cancelledCount = emergency and cancelQueuedExecutions("Cancelled by emergency stop") or 0
         if activeExecutionId then
             interruptRequested = true
-            pendingInterruptIds[#pendingInterruptIds + 1] = message.id
+            pendingInterruptIds[#pendingInterruptIds + 1] = {
+                id = message.id,
+                emergency = emergency,
+                cancelled_count = cancelledCount,
+            }
         else
-            eventReply(message.id, false, "No program is currently running")
+            local explanation = emergency
+                and ("Emergency stop cleared " .. tostring(cancelledCount) .. " queued program(s)")
+                or "No program is currently running"
+            eventReply(message.id, false, explanation)
         end
     elseif message.type == "update_client" then
         local ok, reason = pcall(function()
@@ -589,12 +632,24 @@ local function readerLoop()
                     if not message.data.accept then error(message.data.reason or "server rejected client") end
                     sendTelemetry()
                 elseif message.type == "interrupt" then
+                    local emergency = message.data and message.data.reason == "emergency"
+                    local cancelledCount = emergency and cancelQueuedExecutions("Cancelled by emergency stop") or 0
                     if activeExecutionId then
                         interruptRequested = true
-                        pendingInterruptIds[#pendingInterruptIds + 1] = message.id
+                        pendingInterruptIds[#pendingInterruptIds + 1] = {
+                            id = message.id,
+                            emergency = emergency,
+                            cancelled_count = cancelledCount,
+                        }
                     else
-                        eventReply(message.id, false, "No program is currently running")
+                        local explanation = emergency
+                            and ("Emergency stop cleared " .. tostring(cancelledCount) .. " queued program(s)")
+                            or "No program is currently running"
+                        eventReply(message.id, false, explanation)
                     end
+                elseif message.type == "exec" then
+                    pendingExecutions[#pendingExecutions + 1] = message
+                    os.queueEvent("aicontrol_message")
                 else
                     os.queueEvent("aicontrol_message", message)
                 end
@@ -621,14 +676,20 @@ end
 
 local function executionLoop()
     while true do
-        local _, message = os.pullEvent("aicontrol_message")
-        local ok, reason = pcall(handleIncoming, message)
-        if not ok then
-            log("message handler failed: " .. tostring(reason))
-            sendMessage(envelope("error", {
-                code = "client_handler_error",
-                message = tostring(reason),
-            }, nextId("error")))
+        local message = table.remove(pendingExecutions, 1)
+        if not message then
+            os.pullEvent("aicontrol_message")
+            message = table.remove(pendingExecutions, 1)
+        end
+        if message then
+            local ok, reason = pcall(handleIncoming, message)
+            if not ok then
+                log("message handler failed: " .. tostring(reason))
+                sendMessage(envelope("error", {
+                    code = "client_handler_error",
+                    message = tostring(reason),
+                }, nextId("error")))
+            end
         end
     end
 end

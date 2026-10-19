@@ -5,6 +5,7 @@ from fastapi import FastAPI, HTTPException
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 
+from aicontrol.api.computers import router as computers_router
 from aicontrol.auth.routes import router as auth_router
 from aicontrol.auth.websocket import router as auth_websocket_router
 from aicontrol.client_files import router as client_router
@@ -36,6 +37,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.include_router(auth_router)
     app.include_router(auth_websocket_router)
     app.include_router(client_router)
+    app.include_router(computers_router)
     app.include_router(pairing_router)
     web_dist = _find_web_dist(app_settings)
 

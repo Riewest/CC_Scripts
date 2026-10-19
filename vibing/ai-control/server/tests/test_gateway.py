@@ -1,6 +1,7 @@
 import asyncio
 import threading
 import time
+from datetime import timedelta
 
 import pytest
 from fakecc import FakeCC
@@ -9,10 +10,19 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 
 from aicontrol.config import Settings
-from aicontrol.db.models import AuditEvent, Computer, ComputerStatus
+from aicontrol.db.models import AuditEvent, Computer, ComputerStatus, PairingCode, User, utc_now
+from aicontrol.db.security import hash_pairing_code, verify_secret
 from aicontrol.gateway.registry import GatewayConnection, WebSocketGateway
+from aicontrol.pairing.rate_limit import pairing_exchange_limiter
 from aicontrol.protocol.models import ExecMessage, ExecResultMessage, InterruptMessage
 from aicontrol.protocol.validation import parse_message
+
+
+@pytest.fixture(autouse=True)
+def reset_pairing_rate_limiter():
+    pairing_exchange_limiter.reset()
+    yield
+    pairing_exchange_limiter.reset()
 
 
 def read_computer_status(database_url: str, computer_id: str) -> tuple[ComputerStatus, object]:
@@ -100,6 +110,178 @@ def test_pairing_code_issues_persistent_device_secret(gateway_context) -> None:
 
     status, _ = read_computer_status(database_url, device_id)
     assert status == ComputerStatus.OFFLINE
+
+
+def test_pairing_code_is_single_use(gateway_context) -> None:
+    client, _, _, _ = gateway_context
+    with FakeCC(client, "first-device", "pairing-code") as first:
+        assert first.receive_json()["data"]["accept"] is True
+        first.disconnect()
+
+    with client.websocket_connect("/ws/computer") as second:
+        second.send_json(
+            {
+                "v": 1,
+                "type": "hello",
+                "data": {
+                    "device_id": "second-device",
+                    "secret": "pairing-code",
+                    "kind": "computer",
+                    "label": "Second",
+                    "client_version": "test",
+                },
+            }
+        )
+        with pytest.raises(WebSocketDisconnect) as rejected:
+            second.receive_json()
+        assert rejected.value.code == 4401
+
+
+def test_invalid_pairing_attempts_are_rate_limited(gateway_context, monkeypatch) -> None:
+    client, _, _, _ = gateway_context
+    monkeypatch.setattr(pairing_exchange_limiter, "max_attempts", 2)
+    for index in range(2):
+        with client.websocket_connect("/ws/computer") as websocket:
+            websocket.send_json(
+                {
+                    "v": 1,
+                    "type": "hello",
+                    "data": {
+                        "device_id": f"unknown-{index}",
+                        "secret": "invalid-code",
+                        "kind": "computer",
+                        "label": "Fake",
+                        "client_version": "test",
+                    },
+                }
+            )
+            with pytest.raises(WebSocketDisconnect) as rejected:
+                websocket.receive_json()
+            assert rejected.value.code == 4401
+
+    with client.websocket_connect("/ws/computer") as websocket:
+        websocket.send_json(
+            {
+                "v": 1,
+                "type": "hello",
+                "data": {
+                    "device_id": "valid-but-rate-limited",
+                    "secret": "pairing-code",
+                    "kind": "computer",
+                    "label": "Fake",
+                    "client_version": "test",
+                },
+            }
+        )
+        with pytest.raises(WebSocketDisconnect) as rejected:
+            websocket.receive_json()
+        assert rejected.value.code == 4401
+
+
+def test_expired_pairing_code_is_rejected(gateway_context) -> None:
+    client, _, database_url, _ = gateway_context
+
+    async def seed_expired_code() -> None:
+        engine = create_async_engine(database_url)
+        factory = async_sessionmaker(engine, expire_on_commit=False)
+        async with factory() as session:
+            owner = await session.scalar(select(User).where(User.username == "gateway-owner"))
+            assert owner is not None
+            session.add(
+                PairingCode(
+                    code_hash=hash_pairing_code("EXPIRE"),
+                    owner_user_id=owner.id,
+                    expires_at=utc_now() - timedelta(seconds=1),
+                )
+            )
+            await session.commit()
+        await engine.dispose()
+
+    asyncio.run(seed_expired_code())
+    with client.websocket_connect("/ws/computer") as websocket:
+        websocket.send_json(
+            {
+                "v": 1,
+                "type": "hello",
+                "data": {
+                    "device_id": "expired-device",
+                    "secret": "EXPIRE",
+                    "kind": "computer",
+                    "label": "Expired",
+                    "client_version": "test",
+                },
+            }
+        )
+        with pytest.raises(WebSocketDisconnect) as rejected:
+            websocket.receive_json()
+        assert rejected.value.code == 4401
+
+
+def test_repair_code_rotates_secret_without_changing_device_identity(gateway_context) -> None:
+    client, app, database_url, computer_id = gateway_context
+    new_pairing_code = "ROTATE"
+
+    async def add_repair_code() -> None:
+        engine = create_async_engine(database_url)
+        factory = async_sessionmaker(engine, expire_on_commit=False)
+        async with factory() as session:
+            session.add(
+                PairingCode(
+                    code_hash=hash_pairing_code(new_pairing_code),
+                    target_computer_id=computer_id,
+                    expires_at=utc_now() + timedelta(minutes=5),
+                )
+            )
+            await session.commit()
+        await engine.dispose()
+
+    asyncio.run(add_repair_code())
+    with FakeCC(client, computer_id, new_pairing_code) as repaired:
+        ack = repaired.receive_json()
+        assert ack["data"]["accept"] is True
+        new_secret = ack["data"]["device_secret"]
+        repaired.disconnect()
+        wait_for_unregistered(app, computer_id)
+
+    with client.websocket_connect("/ws/computer") as stale_client:
+        stale_client.send_json(
+            {
+                "v": 1,
+                "type": "hello",
+                "data": {
+                    "device_id": computer_id,
+                    "secret": "correct-secret",
+                    "kind": "computer",
+                    "label": "Old credentials",
+                    "client_version": "test",
+                },
+            }
+        )
+        with pytest.raises(WebSocketDisconnect) as rejected:
+            stale_client.receive_json()
+        assert rejected.value.code == 4401
+
+    with FakeCC(client, computer_id, new_secret) as connected:
+        assert connected.receive_json()["data"]["accept"] is True
+        connected.disconnect()
+        wait_for_unregistered(app, computer_id)
+
+    async def verify_rotated_secret() -> None:
+        engine = create_async_engine(database_url)
+        factory = async_sessionmaker(engine, expire_on_commit=False)
+        async with factory() as session:
+            record = await session.get(Computer, computer_id)
+            assert record is not None
+            assert verify_secret(record.device_secret_hash, new_secret)
+            used_code = await session.scalar(
+                select(PairingCode).where(PairingCode.code_hash == hash_pairing_code(new_pairing_code))
+            )
+            assert used_code is not None
+            assert used_code.used_at is not None
+            assert used_code.paired_computer_id == computer_id
+        await engine.dispose()
+
+    asyncio.run(verify_rotated_secret())
 
 
 def test_missing_hello_is_closed_with_timeout(gateway_context) -> None:

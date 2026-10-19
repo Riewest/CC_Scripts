@@ -1,33 +1,27 @@
-import React from 'react'
+import React, { useCallback, useEffect, useState } from 'react'
 import ReactDOM from 'react-dom/client'
+import { AddComputer } from './pages/AddComputer'
+import { AuthPage } from './pages/AuthPage'
+import { Dashboard } from './pages/Dashboard'
 import './style.css'
 
 function App() {
-  return (
-    <main className="shell">
-      <header className="topbar">
-        <a className="brand" href="/" aria-label="AI Control home">
-          <span className="brand-mark">⌘</span>
-          <span>AI Control</span>
-        </a>
-        <span className="connection"><i /> Control plane ready</span>
-      </header>
-      <section className="hero">
-        <p className="eyebrow">COMPUTERCRAFT · CONTROL PLANE</p>
-        <h1>Your fleet,<br /><em>within reach.</em></h1>
-        <p className="intro">Connect computers, turtles, and pocket computers. Build and run the control experience that fits your world.</p>
-        <div className="empty-state">
-          <div className="terminal-icon"><span>›_</span></div>
-          <div>
-            <h2>No computers connected</h2>
-            <p>Once you pair a device, its status and controls will appear here.</p>
-          </div>
-          <span className="status-pill">WAITING FOR DEVICE</span>
-        </div>
-      </section>
-      <footer><span>AI CONTROL <b>·</b> EARLY ACCESS</span><span>Made for your world.</span></footer>
-    </main>
-  )
+  const [authState, setAuthState] = useState<'checking' | 'signed-out' | 'signed-in'>('checking')
+  const [showAddComputer, setShowAddComputer] = useState(false)
+  const [repairTarget, setRepairTarget] = useState<{ id: string; label: string } | null>(null)
+  const handleLogout = useCallback(() => setAuthState('signed-out'), [])
+  const handleAddComputer = useCallback(() => setShowAddComputer(true), [])
+
+  useEffect(() => {
+    fetch('/api/auth/me', { credentials: 'include' })
+      .then((response) => setAuthState(response.ok ? 'signed-in' : 'signed-out'))
+      .catch(() => setAuthState('signed-out'))
+  }, [])
+
+  if (authState === 'checking') return <main className="shell"><div className="auth-loading">Loading AI Control…</div></main>
+  if (authState === 'signed-out') return <main className="shell"><AuthPage onAuthenticated={() => setAuthState('signed-in')} /></main>
+  if (showAddComputer || repairTarget) return <main className="shell"><AddComputer onBack={() => { setShowAddComputer(false); setRepairTarget(null) }} repairComputerId={repairTarget?.id} repairLabel={repairTarget?.label} /></main>
+  return <main className="shell"><Dashboard onAddComputer={handleAddComputer} onRepairComputer={(computer) => setRepairTarget(computer)} onLogout={handleLogout} /></main>
 }
 
 ReactDOM.createRoot(document.getElementById('root')!).render(

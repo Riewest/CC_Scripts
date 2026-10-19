@@ -138,6 +138,7 @@ class Computer(TimestampMixin, Base):
     advanced: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
     cc_version: Mapped[str | None] = mapped_column(String(80))
     last_seen: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    telemetry: Mapped[dict[str, Any] | None] = mapped_column(JSON)
     status: Mapped[ComputerStatus] = mapped_column(
         Enum(ComputerStatus), default=ComputerStatus.OFFLINE, nullable=False
     )
@@ -148,6 +149,7 @@ class Computer(TimestampMixin, Base):
     script_versions: Mapped[list[ScriptVersion]] = relationship(back_populates="computer")
     ai_sessions: Mapped[list[AiSession]] = relationship(back_populates="computer")
     goals: Mapped[list[Goal]] = relationship(back_populates="computer")
+    runs: Mapped[list[ExecRun]] = relationship(back_populates="computer", cascade="all, delete-orphan")
 
 
 class PairingCode(TimestampMixin, Base):
@@ -155,12 +157,20 @@ class PairingCode(TimestampMixin, Base):
     __table_args__ = (
         Index("ix_pairing_codes_code_hash", "code_hash", unique=True),
         Index("ix_pairing_codes_expires_at", "expires_at"),
+        Index("ix_pairing_codes_target_computer_id", "target_computer_id"),
     )
 
     id: Mapped[str] = mapped_column(String(36), primary_key=True, default=new_id)
     code_hash: Mapped[str] = mapped_column(String(255), nullable=False)
     owner_user_id: Mapped[str | None] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), index=True)
     owner_team_id: Mapped[str | None] = mapped_column(ForeignKey("teams.id", ondelete="CASCADE"), index=True)
+    target_computer_id: Mapped[str | None] = mapped_column(
+        ForeignKey("computers.id", ondelete="CASCADE", name="fk_pairing_codes_target_computer")
+    )
+    paired_computer_id: Mapped[str | None] = mapped_column(
+        ForeignKey("computers.id", ondelete="SET NULL", name="fk_pairing_codes_paired_computer")
+    )
+    label: Mapped[str | None] = mapped_column(String(120))
     expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
     used_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
 
@@ -264,6 +274,28 @@ class AuditEvent(TimestampMixin, Base):
     target_type: Mapped[str | None] = mapped_column(String(80))
     target_id: Mapped[str | None] = mapped_column(String(36))
     details: Mapped[dict[str, Any] | None] = mapped_column(JSON)
+    actor: Mapped[User | None] = relationship()
+
+
+class ExecRun(Base):
+    __tablename__ = "exec_runs"
+    __table_args__ = (
+        Index("ix_exec_runs_computer_started", "computer_id", "started_at"),
+        Index("ix_exec_runs_actor_user_id", "actor_user_id"),
+    )
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=new_id)
+    computer_id: Mapped[str] = mapped_column(
+        ForeignKey("computers.id", ondelete="CASCADE"), nullable=False
+    )
+    actor_user_id: Mapped[str | None] = mapped_column(
+        ForeignKey("users.id", ondelete="SET NULL")
+    )
+    code: Mapped[str] = mapped_column(Text, nullable=False)
+    started_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    finished_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    result: Mapped[dict[str, Any] | None] = mapped_column(JSON)
+    computer: Mapped[Computer] = relationship(back_populates="runs")
     actor: Mapped[User | None] = relationship()
 
 

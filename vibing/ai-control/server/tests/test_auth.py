@@ -10,7 +10,7 @@ from sqlalchemy.pool import NullPool
 
 from aicontrol.auth.rate_limit import login_rate_limiter
 from aicontrol.config import Settings
-from aicontrol.db.models import Base
+from aicontrol.db.models import Base, User, UserRole
 from aicontrol.db.session import get_session
 from aicontrol.main import create_app
 
@@ -34,6 +34,7 @@ def auth_client(tmp_path: Path) -> Iterator[TestClient]:
             yield session
 
     app = create_app(Settings(_env_file=None, database_url=database_url, allow_signup=False))
+    app.state.test_database_url = database_url
     app.dependency_overrides[get_session] = override_session
     login_rate_limiter.clear()
     with TestClient(app) as client:
@@ -80,6 +81,30 @@ def test_first_user_setup_is_single_use_and_sets_secure_session_cookies(auth_cli
         json={"username": "another", "password": "another-long-password"},
     )
     assert duplicate.status_code == 409
+
+
+def test_setup_promotes_passwordless_pairing_owner_without_losing_devices(auth_client) -> None:
+    async def seed_placeholder() -> str:
+        engine = create_async_engine(auth_client.app.state.test_database_url)
+        factory = async_sessionmaker(engine, expire_on_commit=False)
+        async with factory() as session:
+            placeholder = User(username="pairing-owner", role=UserRole.ADMIN)
+            session.add(placeholder)
+            await session.flush()
+            await session.commit()
+            placeholder_id = placeholder.id
+        await engine.dispose()
+        return placeholder_id
+
+    placeholder_id = asyncio.run(seed_placeholder())
+    assert auth_client.get("/api/auth/setup-state").json()["setup_required"] is True
+    response = auth_client.post(
+        "/api/auth/setup",
+        json={"username": "pairing-owner", "password": "a-long-setup-password"},
+    )
+    assert response.status_code == 201
+    assert response.json()["id"] == placeholder_id
+    assert auth_client.get("/api/auth/setup-state").json()["setup_required"] is False
 
 
 def test_https_session_cookies_are_secure(auth_client) -> None:

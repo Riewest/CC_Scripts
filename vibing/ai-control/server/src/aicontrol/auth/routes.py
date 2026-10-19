@@ -7,7 +7,7 @@ from typing import Annotated
 from argon2 import PasswordHasher
 from fastapi import APIRouter, Depends, HTTPException, Request, Response, status
 from fastapi.responses import JSONResponse
-from sqlalchemy import exists, func, insert, literal, select
+from sqlalchemy import func, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -24,12 +24,13 @@ from aicontrol.auth.sessions import (
     user_payload,
 )
 from aicontrol.config import Settings
-from aicontrol.db.models import ApiToken, User, UserRole, new_id, utc_now
+from aicontrol.db.models import ApiToken, User, UserRole
 from aicontrol.db.security import hash_secret, verify_secret
 from aicontrol.db.session import get_session
 
 router = APIRouter(prefix="/api/auth", tags=["auth"])
 DUMMY_PASSWORD_HASH = PasswordHasher().hash(secrets.token_urlsafe(32))
+_setup_lock = asyncio.Lock()
 
 
 def _password_is_valid(password: str) -> bool:
@@ -58,9 +59,11 @@ async def setup_state(
     request: Request,
     session: Annotated[AsyncSession, Depends(get_session)],
 ) -> dict[str, bool]:
-    user_count = await session.scalar(select(func.count()).select_from(User))
+    local_account_count = await session.scalar(
+        select(func.count()).select_from(User).where(User.password_hash.is_not(None))
+    )
     settings: Settings = request.app.state.settings
-    return {"setup_required": user_count == 0, "signup_allowed": settings.allow_signup}
+    return {"setup_required": local_account_count == 0, "signup_allowed": settings.allow_signup}
 
 
 @router.post("/setup", status_code=status.HTTP_201_CREATED)
@@ -71,36 +74,41 @@ async def setup_admin(
 ) -> JSONResponse:
     if not _password_is_valid(credentials.password):
         raise HTTPException(status_code=422, detail="Password must be at least 12 characters")
-    password_hash = await asyncio.to_thread(hash_secret, credentials.password)
-    timestamp = utc_now()
-    statement = (
-        insert(User)
-        .from_select(
-            ["id", "username", "password_hash", "role", "disabled", "created_at", "updated_at"],
-            select(
-                literal(new_id()),
-                literal(credentials.username),
-                literal(password_hash),
-                literal(UserRole.ADMIN.name),
-                literal(False),
-                literal(timestamp),
-                literal(timestamp),
-            ).where(~exists(select(User.id))),
+
+    async with _setup_lock:
+        local_account_count = await session.scalar(
+            select(func.count()).select_from(User).where(User.password_hash.is_not(None))
         )
-        .returning(User.id)
-    )
-    try:
-        user_id = (await session.execute(statement)).scalar_one_or_none()
-        if user_id is None:
-            await session.rollback()
+        if local_account_count:
             raise HTTPException(status_code=409, detail="Initial setup has already been completed")
-        await session.commit()
-    except IntegrityError as exc:
-        await session.rollback()
-        raise HTTPException(status_code=409, detail="Initial setup has already been completed") from exc
-    user = await session.get(User, user_id)
-    if user is None:
-        raise HTTPException(status_code=500, detail="Initial account could not be loaded")
+
+        password_hash = await asyncio.to_thread(hash_secret, credentials.password)
+        existing_user = await session.scalar(
+            select(User).where(User.username == credentials.username)
+        )
+        if existing_user is not None:
+            if existing_user.password_hash is not None:
+                raise HTTPException(status_code=409, detail="Initial setup has already been completed")
+            existing_user.password_hash = password_hash
+            existing_user.role = UserRole.ADMIN
+            user = existing_user
+        else:
+            user = User(
+                username=credentials.username,
+                password_hash=password_hash,
+                role=UserRole.ADMIN,
+            )
+            session.add(user)
+        try:
+            await session.flush()
+            await session.commit()
+        except IntegrityError as exc:
+            await session.rollback()
+            raise HTTPException(
+                status_code=409,
+                detail="Initial setup has already been completed",
+            ) from exc
+
     session_token, csrf_token = await create_browser_session(user, session)
     return _authenticated_response(request, user, session_token, csrf_token, status.HTTP_201_CREATED)
 
@@ -112,8 +120,10 @@ async def register(
     session: Annotated[AsyncSession, Depends(get_session)],
 ) -> JSONResponse:
     settings: Settings = request.app.state.settings
-    user_count = await session.scalar(select(func.count()).select_from(User))
-    if not user_count:
+    local_account_count = await session.scalar(
+        select(func.count()).select_from(User).where(User.password_hash.is_not(None))
+    )
+    if not local_account_count:
         raise HTTPException(status_code=409, detail="Complete initial setup first")
     if not settings.allow_signup:
         raise HTTPException(status_code=403, detail="Sign-up is disabled")

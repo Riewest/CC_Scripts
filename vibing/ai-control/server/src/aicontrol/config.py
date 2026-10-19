@@ -17,6 +17,7 @@ class Settings(BaseSettings):
     database_url: str = "sqlite:///./aicontrol.db"
     environment: str = "development"
     allow_signup: bool = False
+    public_url: str = "http://localhost:8000"
     web_dist_dir: Path | None = None
     client_dist_dir: Path | None = None
     secret_encryption_key: str | None = None

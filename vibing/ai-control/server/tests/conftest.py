@@ -42,7 +42,10 @@ def gateway_context(tmp_path: Path) -> Iterator[tuple[TestClient, FastAPI, str, 
             await connection.run_sync(Base.metadata.create_all)
         factory = async_sessionmaker(engine, expire_on_commit=False)
         async with factory() as session:
-            user = User(username="gateway-owner")
+            user = User(
+                username="gateway-owner",
+                password_hash=hash_secret("gateway-owner-password"),
+            )
             session.add(user)
             await session.flush()
             session.add(
@@ -82,6 +85,7 @@ def gateway_context(tmp_path: Path) -> Iterator[tuple[TestClient, FastAPI, str, 
             heartbeat_timeout_s=0.35,
         )
     )
+    app.state.test_database_url = database_url
     app.dependency_overrides[get_session] = override_session
     with TestClient(app) as client:
         yield client, app, database_url, "device-1"

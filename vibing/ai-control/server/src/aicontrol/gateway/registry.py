@@ -7,7 +7,7 @@ from fastapi import WebSocket
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from aicontrol.config import Settings
-from aicontrol.db.models import AuditEvent
+from aicontrol.db.models import AuditEvent, Computer
 from aicontrol.protocol.models import (
     ChunkMessage,
     ErrorMessage,
@@ -182,6 +182,15 @@ class GatewayConnection:
                 GatewayEvent("error", self.computer_id, message, error_details)
             )
         elif event_name:
+            if isinstance(message, TelemetryMessage):
+                computer = await session.get(Computer, self.computer_id)
+                if computer is not None:
+                    computer.telemetry = message.data.values
+                    await session.commit()
+                    await event_bus.publish(
+                        GatewayEvent("telemetry", self.computer_id, message)
+                    )
+                    return
             await event_bus.publish(GatewayEvent(event_name, self.computer_id, message))
 
     async def close(self, code: int, reason: str) -> None:
