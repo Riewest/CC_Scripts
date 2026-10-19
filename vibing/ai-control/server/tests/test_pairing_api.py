@@ -72,11 +72,13 @@ def test_personal_pairing_code_returns_pasteable_command_and_live_status(pairing
     assert result["command"] == (
         "wget run https://control.example.test/install?code=" + result["code"]
     )
+    assert result["expires_at"].endswith("+00:00")
 
     status = pairing_client.get(f"/api/pairing-codes/{result['id']}")
     assert status.status_code == 200
     assert status.json()["used"] is False
     assert status.json()["paired_computer"] is None
+    assert status.json()["expires_at"].endswith("+00:00")
 
     async def verify_persisted_secret_hash() -> None:
         engine = create_async_engine(pairing_client.app.state.settings.database_url)

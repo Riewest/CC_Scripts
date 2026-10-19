@@ -1,4 +1,4 @@
-from datetime import timedelta
+from datetime import UTC, datetime, timedelta
 from secrets import choice
 from typing import Annotated
 from urllib.parse import urlsplit
@@ -49,9 +49,14 @@ def _response(code: PairingCode, plaintext: str, request: Request) -> PairingCod
     return PairingCodeResponse(
         id=code.id,
         code=plaintext,
-        expires_at=code.expires_at.isoformat(),
+        expires_at=_iso_utc(code.expires_at),
         command=command,
     )
+
+
+def _iso_utc(value: datetime) -> str:
+    aware = value.replace(tzinfo=UTC) if value.tzinfo is None else value.astimezone(UTC)
+    return aware.isoformat()
 
 
 async def _insert_code(
@@ -176,7 +181,7 @@ async def pairing_status(
         }
     return PairingStatusResponse(
         id=pairing.id,
-        expires_at=pairing.expires_at.isoformat(),
+        expires_at=_iso_utc(pairing.expires_at),
         used=pairing.used_at is not None,
         paired_computer=paired,
     )
