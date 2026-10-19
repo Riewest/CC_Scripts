@@ -28,6 +28,8 @@ pytest: exec/interrupt endpoints with fake client, permission denial for non-own
 
 ## Manual MVP verification addendum
 
+**Current canonical checklist:** use [M0/M1 Manual Validation Checklist](../docs/m0-m1-manual-validation.md) for the remaining integrated M1 actions. The notes below preserve the implementation-time test record; they are not a second checklist to execute.
+
 The integrated M1 stop-point checks below require a real CC:Tweaked server and authenticated browser. Run Docker from `vibing/ai-control` with `docker compose up -d --build`, then open `http://localhost:8000`. The existing local database has a passwordless `manual-test-owner` with the three previously paired devices, but initial setup has already been completed by `riewest14`; there is currently no supported password-recovery path for the passwordless owner. Sign in as the account you can access and pair a fresh/test device to it. Do not silently reassign device ownership or reset account data.
 
 1. Sign in and confirm the dashboard lists devices owned by that account. The existing devices owned by `manual-test-owner` will not appear under `riewest14`. Use Add Computer to generate and copy a pairing command, paste it into a fresh/test CC computer shell, and confirm the wizard changes from waiting to paired/online.

@@ -54,7 +54,7 @@ vibing/ai-control/
 | [REQ-007](requirements/REQ-007-registration-flow.md) | Computer registration flow | 004, 005, 006 | done |
 | [REQ-008](requirements/REQ-008-mvp-ui.md) | MVP web UI | 006, 007 | blocked |
 
-**STOP POINT 1 (MVP checklist):** install on a fresh computer via the pasted command; pair with code; see it online; run Lua and see output; trigger an error and see traceback; interrupt a `while true do end` loop; restart the server and see the client reconnect; test on a turtle and a pocket computer.
+**STOP POINT 1 (MVP checklist):** install on a fresh computer via the pasted command; pair with code; see it online; run Lua and see output; trigger an error and see traceback; interrupt a `while true do end` loop; restart the server and see the client reconnect; test on a turtle and a pocket computer. Consolidated remaining manual steps: [M0/M1 Manual Validation Checklist](docs/m0-m1-manual-validation.md).
 
 ### M2 Multi-user and sharing
 | ID | Title | Depends | Status |

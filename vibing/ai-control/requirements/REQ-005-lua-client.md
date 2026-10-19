@@ -32,6 +32,8 @@ pytest: manifest hashes, install script content, file serving, pairing handshake
 
 ## Manual test addendum (same-host Docker + Minecraft)
 
+**Current canonical checklist:** use [M0/M1 Manual Validation Checklist](../docs/m0-m1-manual-validation.md). The detailed steps below are historical troubleshooting notes for the earlier install/reconnect phase; do not repeat them unless a fresh device install or reconnect failure needs diagnosis.
+
 Use these steps to test the currently available REQ-005 behavior. Run shell commands in Git Bash/WSL on the host. Since Minecraft and Docker run on the same computer, the ComputerCraft client URL is `http://localhost:8000`. The Docker container must be running throughout installation and reconnect checks. It applies Alembic migrations on startup and stores state in the persistent `ai-control-data` volume.
 
 ### 1. Start Docker and confirm the endpoints
