@@ -95,6 +95,20 @@ def test_unknown_type_is_ignored_and_logged(monkeypatch) -> None:
 @pytest.mark.parametrize(
     "payload",
     [
+        '{"v":1,"type":"exec_result","reply_to":"run-1","data":{"ok":true,"return_values":{},"output":"","duration_ms":1}}',
+        '{"v":1,"type":"exec_result","reply_to":"run-1","data":{"ok":false,"return_values":{},"output":"","error":"intentional failure","traceback":"stack trace","duration_ms":1}}',
+    ],
+)
+def test_exec_result_accepts_cc_tweaked_empty_return_table(payload: str) -> None:
+    message = parse_message(payload)
+
+    assert isinstance(message, ExecResultMessage)
+    assert message.data.return_values == []
+
+
+@pytest.mark.parametrize(
+    "payload",
+    [
         "not-json",
         '{"v":2,"type":"heartbeat","data":{}}',
         '{"v":1,"type":"exec","id":"x","data":{"code":""}}',

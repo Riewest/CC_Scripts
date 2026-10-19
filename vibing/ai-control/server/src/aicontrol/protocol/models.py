@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import Annotated, Any, Literal
 
-from pydantic import BaseModel, ConfigDict, Field, TypeAdapter, model_validator
+from pydantic import BaseModel, ConfigDict, Field, TypeAdapter, field_validator, model_validator
 
 
 class ProtocolModel(BaseModel):
@@ -75,6 +75,13 @@ class ExecResultData(DataModel):
     error: str | None = None
     traceback: str | None = None
     duration_ms: float = Field(ge=0)
+
+    @field_validator("return_values", mode="before")
+    @classmethod
+    def normalize_empty_return_values(cls, value: Any) -> Any:
+        # CC:Tweaked's JSON serializer encodes an empty Lua table as `{}`.
+        # The client uses an empty table when a program returns no values or errors.
+        return [] if value == {} else value
 
 
 class ExecResultMessage(ProtocolModel):

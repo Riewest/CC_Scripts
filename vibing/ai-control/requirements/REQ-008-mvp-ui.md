@@ -31,7 +31,7 @@ pytest: exec/interrupt endpoints with fake client, permission denial for non-own
 The integrated M1 stop-point checks below require a real CC:Tweaked server and authenticated browser. Run Docker from `vibing/ai-control` with `docker compose up -d --build`, then open `http://localhost:8000`. The existing local database has a passwordless `manual-test-owner` with the three previously paired devices, but initial setup has already been completed by `riewest14`; there is currently no supported password-recovery path for the passwordless owner. Sign in as the account you can access and pair a fresh/test device to it. Do not silently reassign device ownership or reset account data.
 
 1. Sign in and confirm the dashboard lists devices owned by that account. The existing devices owned by `manual-test-owner` will not appear under `riewest14`. Use Add Computer to generate and copy a pairing command, paste it into a fresh/test CC computer shell, and confirm the wizard changes from waiting to paired/online.
-2. Select a computer and run this harmless check:
+2. **Verified on Computer 15:** run this harmless check:
 
    ```lua
    print("hello from AI Control")
@@ -40,7 +40,7 @@ The integrated M1 stop-point checks below require a real CC:Tweaked server and a
    ```
 
 	Confirm the UI shows captured output and both return values. Check Recent runs for the persisted run record.
-3. Test compile and runtime error rendering separately:
+3. **Verified on Computer 15 after refreshing the client:** test compile and runtime error rendering separately:
 
    ```lua
    local = broken
@@ -56,7 +56,7 @@ The integrated M1 stop-point checks below require a real CC:Tweaked server and a
 6. Stop/restart Docker with the REQ-005 addendum procedure; the UI should show offline, then live status/telemetry again when each client reconnects.
 7. Sign out and verify `/api/computers` is no longer accessible without logging in. Sign in as another account (if signup has been enabled for testing) and verify it cannot see the first owner's devices.
 
-The manual checks above are the remaining integrated M1 STOP POINT 1 gate. Record actual in-game results there before proceeding to M2.
+The harmless output/return-value check and both compile/runtime traceback checks above passed on Computer 15 on 2026-10-19. Remaining integrated M1 STOP POINT 1 checks are fresh pairing, interrupt/emergency queue cancellation, turtle/pocket telemetry, and Docker stop/start reconnect. Record those outcomes before proceeding to M2.
 
 ## Pairing countdown timezone fix
 

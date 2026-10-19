@@ -321,6 +321,7 @@ local function outputEnvironment(capture)
     local environment = copyTable(_ENV, { debug = true })
     local realPrint = print
     local realWrite = write
+    environment.error = error
     environment.print = function(...)
         local values = {}
         for index = 1, select("#", ...) do
