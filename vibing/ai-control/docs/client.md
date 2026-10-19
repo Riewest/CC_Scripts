@@ -19,11 +19,11 @@ The installer endpoint is `GET /install?code=...`; `GET /client/manifest.json` r
 ## Runtime behavior
 
 - The client reconnects with exponential backoff (1, 2, 4, ... up to 60 seconds), resets the delay to one second after a successful session, and logs failures to `/aicontrol/log`.
-- It sends heartbeats and periodic telemetry. Turtle telemetry includes fuel, selected slot, inventory details and equipped tools. It reports peripherals and reads `/GPS/INS.json` when `/squid/INS.lua` is present; otherwise it tries GPS when available.
+- It sends heartbeats and periodic telemetry. It also sends a fresh snapshot after each remote program completes and immediately when a peripheral attaches or detaches. Turtle telemetry includes fuel, selected slot, inventory details and equipped tools. It reports peripherals and reads `/GPS/INS.json` when `/squid/INS.lua` is present; otherwise it tries GPS when available.
 - Remote code runs in a copied global environment. `print` and `write` output is captured and also shown on the computer. Return values are converted to dense JSON arrays; nil, non-finite numbers and cyclic tables use explicit JSON-safe representations. Large results are truncated with a marker before transmission.
-- The executor checks for an interrupt every 10,000 Lua instructions using a coroutine debug hook. A pending turtle/peripheral API call is not preemptible; the interrupt is applied at the next Lua yield and the client replies with this limitation. Confirm the hook's behavior in the target CC:Tweaked build using the STOP POINT 1 in-game checklist.
+- The executor checks for an interrupt every 10,000 Lua instructions using a coroutine debug hook. A pending turtle/peripheral API call is not preemptible; the interrupt is applied at the next Lua yield and the client replies with this limitation. This behavior was verified on the M1 target build.
 - A server `update_client` message applies supplied files, or accepts a URL to a JSON manifest shaped as `{"version":"...","files":{"client.lua":"https://.../client.lua"}}`; downloaded files are installed and the client reboots so new startup/client code runs cleanly.
 
-## Manual checklist
+## Validation history
 
-Follow the step-by-step [REQ-005 manual test addendum](../requirements/REQ-005-lua-client.md) for currently testable installation, pairing, and reconnect behavior. The complete integrated MVP checklist remains at the [M1 STOP POINT 1](../PLAN.md); its run-code, UI, telemetry, and interrupt checks become actionable when those features are implemented.
+The completed M0/M1 manual acceptance results are retained in the [archived validation record](../requirements/manual-validation/M0-M1-validation-record.md). For installation and daily operation, use the instructions above.

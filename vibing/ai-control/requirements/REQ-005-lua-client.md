@@ -1,5 +1,5 @@
 # REQ-005 Lua client and installer
-Status: blocked | Milestone: M1 | Depends: REQ-003, REQ-004
+Status: done | Milestone: M1 | Depends: REQ-003, REQ-004
 
 ## Goal
 A Lua client that installs with one command, stays connected, runs server-sent code, can be interrupted, and reports all errors.
@@ -11,7 +11,7 @@ A Lua client that installs with one command, stays connected, runs server-sent c
 - Pairing: first connect uses the pairing code in `hello`; server replies with a device secret persisted in `/aicontrol/config`; later connects use the secret.
 - Runner: executes code with `load(code, "=remote", "t", env)` in a coroutine; the main loop uses `parallel.waitForAny` over the WebSocket reader and the running program so an `interrupt` message terminates the program coroutine. Captures `print`/`write` output and return values; sends `exec_result` with error message plus traceback via `xpcall` and `debug.traceback`.
 - Program environment is a copy of `_ENV` with `print` redirected to the capture buffer (and the real terminal).
-- Telemetry on connect and every N seconds: id, label, kind, advanced, version, uptime, day/time; turtle fuel, fuel limit, selected slot, inventory (16 slots with item details), equipped tools; list of attached peripherals with types; position via INS if `/squid/INS.lua` exists, otherwise GPS if available.
+- Telemetry on connect and every N seconds, after each remote execution, and on peripheral attach/detach: id, label, kind, advanced, version, uptime, day/time; turtle fuel, fuel limit, selected slot, inventory (16 slots with item details), equipped tools; list of attached peripherals with types; position via INS if `/squid/INS.lua` exists, otherwise GPS if available.
 - Reconnect with exponential backoff; never crash the main loop; log to `/aicontrol/log`.
 - Known limit: an in-flight `turtle.*` call cannot be aborted; interrupt takes effect at the next yield. Document and report this in the interrupt reply.
 
@@ -25,16 +25,16 @@ A Lua client that installs with one command, stays connected, runs server-sent c
 - [x] Manifest and file endpoints implemented and tested server-side.
 
 ## Test plan
-pytest: manifest hashes, install script content, file serving, pairing handshake with fake client. Current in-game setup and reconnect tests are in the manual test addendum below; integrated UI/run/interrupt checks remain in PLAN.md STOP POINT 1 for the completed M1 milestone.
+pytest: manifest hashes, install script content, file serving, pairing handshake with fake client. Completed real-device results are archived in [M0/M1 validation record](manual-validation/M0-M1-validation-record.md).
 
 ## Files touched
 `client/**`, `server/aicontrol/client_dist/**`, `docs/client.md`.
 
-## Manual test addendum (same-host Docker + Minecraft)
+## Archived manual validation
 
-**Current canonical checklist:** use [M0/M1 Manual Validation Checklist](../docs/m0-m1-manual-validation.md). The detailed steps below are historical troubleshooting notes for the earlier install/reconnect phase; do not repeat them unless a fresh device install or reconnect failure needs diagnosis.
+Completed manual acceptance results are archived in [M0/M1 validation record](manual-validation/M0-M1-validation-record.md). The detailed addendum below is retained as historical installation/reconnect troubleshooting and is not an active checklist.
 
-Use these steps to test the currently available REQ-005 behavior. Run shell commands in Git Bash/WSL on the host. Since Minecraft and Docker run on the same computer, the ComputerCraft client URL is `http://localhost:8000`. The Docker container must be running throughout installation and reconnect checks. It applies Alembic migrations on startup and stores state in the persistent `ai-control-data` volume.
+The following detailed steps are retained as historical install/reconnect troubleshooting. REQ-005 is complete; consult the archived [M0/M1 validation record](manual-validation/M0-M1-validation-record.md) for final acceptance outcomes. Run these only when diagnosing a future fresh install or reconnect issue. They assume Minecraft and Docker share a host and ComputerCraft can reach `http://localhost:8000`.
 
 ### 1. Start Docker and confirm the endpoints
 
@@ -230,14 +230,9 @@ docker compose down
 
 Do not use `docker compose down -v`; `-v` deletes the database volume and the paired device records.
 
-### 6. Record what this requirement can and cannot verify today
+### 6. Archived verification summary
 
-- [x] Fresh install/pairing and stable online status verified on the pocket computer after the receive-timeout fix.
-- [x] Fresh install and pairing on a normal computer and turtle; both return online.
-- [x] Pocket reboot reconnects using its saved device secret; `last_seen` advanced while online.
-- [x] Verify normal computer and turtle reboot reconnect using their saved device secrets.
-- [x] Docker restart and short stop/start outage are recovered; devices return online.
-- [ ] Real remote code output/return values, compile/runtime traceback display, and one-second `while true do end` interrupt. **Blocked:** the current scaffold has no run-code/interrupt UI or API.
-- [ ] Visible turtle telemetry, pocket terminal control, and interactive self-update. **Blocked:** their UI/API is not part of REQ-005; these are delivered by later operator-tool requirements.
-
-Do not mark the blocked checks as passed based only on Lua syntax parsing or automated fake-client tests. Carry the remaining UI-dependent checks to the relevant requirements and revisit them at the full MVP milestone stop point.
+- [x] Fresh install, pairing and stable online status verified on computer, turtle and pocket computer.
+- [x] Device reboot, Docker restart, and short stop/start outage recovery verified.
+- [x] Remote output, return values, compile/runtime tracebacks, and tight-loop interrupt verified through the integrated UI.
+- [x] Turtle telemetry and equipment presentation verified. Integrated results are in [M0/M1 validation record](manual-validation/M0-M1-validation-record.md).
