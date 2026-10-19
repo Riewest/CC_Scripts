@@ -65,7 +65,7 @@ vibing/ai-control/
 | [REQ-012](requirements/REQ-012-groups-sharing.md) | Groups and sharing | 011 | done |
 | [REQ-013](requirements/REQ-013-audit-log.md) | Audit log | 008 | done |
 
-**STOP POINT 2 — IMPLEMENTATION COMPLETE; MANUAL VALIDATION PENDING:** M2 requirements REQ-009–013 are implemented and committed. Before declaring STOP POINT 2 fully verified, manually validate with two users, one team and a shared group across viewer/operator/owner permissions and live revocation; sign in using a configured real OIDC provider; and inspect audit activity. Follow-up checklist: [M2 manual validation](requirements/manual-validation/M2-validation-checklist.md). Do not start M3 until authorized.
+**STOP POINT 2 — COMPLETE (2026-10-19):** M2 requirements REQ-009–013 are implemented and committed. The user accepts the manual two-user/team/group permission checks, real Authentik login and audit review as good enough for this milestone; known follow-up bugs may be handled later. Trial notes and follow-up fixes are retained in [M2 manual validation](requirements/manual-validation/M2-validation-checklist.md). M3 requirements remain todo; this closure does not start M3.
 
 ### M3 Operator tooling
 | ID | Title | Depends | Status |

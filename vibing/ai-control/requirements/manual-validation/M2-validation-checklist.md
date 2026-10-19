@@ -1,6 +1,6 @@
 # M2 Manual Validation Checklist
 
-Status: pending — M2 implementation and automated validation are complete; STOP POINT 2 remains open until these integrated checks are confirmed.
+Status: complete — user accepted M2 manual validation as sufficient for STOP POINT 2 on 2026-10-19. Trial notes and Authentik follow-up fixes remain below for traceability; future bugs may be handled separately.
 
 ## Setup
 
@@ -59,4 +59,4 @@ This looked all good
 
 ## Record results
 
-Add a dated follow-up entry here or in PROGRESS.md with pass/fail and non-secret evidence only. Never record passwords, provider secrets, tokens, pairing codes or device secrets.
+User accepted the team/sharing trial as good enough for this milestone; audit review looked good. Authentik login succeeded; preferred-username handling and the existing `riewest14` account collision were then addressed in code, and generated OIDC test users were removed. No passwords, provider secrets, tokens, pairing codes or device secrets are recorded here. Any later M2 regression should be appended as a dated follow-up, not treated as permission to start M3.

@@ -83,6 +83,7 @@ Append-only. Newest entries at the bottom. Format: `YYYY-MM-DD | REQ-NNN | what 
 
 ### M2 trial validation
 - 2026-10-19 | M2 trial fix validated | OIDC preferred-username handling, explicit collision/link behavior and safe recovery of an exact, empty legacy generated identity implemented and tested. Recovery refuses shadow accounts with credentials, owned resources, memberships, shares, tokens, runs, goals or audit history; successful transfer disables the empty shadow account and is audited | Full backend suite 123 passed, Ruff clean, frontend build passed. Rotate the Authentik client secret exposed during the trial before continuing; actual Authentik sign-in/link verification remains manual. STOP POINT 2 remains pending, and M3 is not authorized
+- 2026-10-19 | M2 STOP POINT 2 complete | User accepted the two-user/team/group manual trial as good enough and confirmed the audit log looked good; Authentik login was exercised, the observed username/collision behavior was fixed, and disposable generated OIDC users were removed while preserving team/computer data | Manual checklist marked complete; user will address any later M2 bugs separately. M3 requirements remain todo and no M3 implementation was started | Next: provide Codex handoff prompt for M3; implement only when the next agent is explicitly instructed
 
 ## Ideas (out of scope, parked)
 - (none yet)
