@@ -608,6 +608,12 @@ local function sendTelemetry()
                 values.inventory[#values.inventory + 1] = detail
             end
         end
+        for side, method in pairs({ left = "getEquippedLeft", right = "getEquippedRight" }) do
+            if turtle[method] then
+                local ok, equipped = pcall(turtle[method])
+                if ok then values["equipped_" .. side] = equipped end
+            end
+        end
     end
 
     if peripheral and peripheral.getNames then

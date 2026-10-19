@@ -43,6 +43,21 @@ function pretty(value: unknown): string {
   return value === undefined || value === null ? '—' : typeof value === 'object' ? JSON.stringify(value) : String(value)
 }
 
+function equipmentLabel(value: unknown): string {
+  if (!value || typeof value !== 'object') return 'Empty'
+  const item = value as { displayName?: unknown; name?: unknown; count?: unknown; damage?: unknown; maxDamage?: unknown }
+  const label = typeof item.displayName === 'string'
+    ? item.displayName
+    : typeof item.name === 'string'
+      ? item.name.split(':').pop()?.replaceAll('_', ' ') ?? 'Item'
+      : 'Item'
+  const details = [
+    typeof item.count === 'number' && item.count > 1 ? `×${item.count}` : null,
+    typeof item.damage === 'number' && typeof item.maxDamage === 'number' ? `${item.maxDamage - item.damage}/${item.maxDamage} durability` : null,
+  ].filter(Boolean)
+  return details.length ? `${label} · ${details.join(' · ')}` : label
+}
+
 export function Dashboard({
   onAddComputer,
   onRepairComputer,
@@ -199,6 +214,10 @@ export function Dashboard({
                 const item = (selected.telemetry?.inventory as Array<{ slot?: number; name?: string; displayName?: string; count?: number }>).find((entry) => entry.slot === slot)
                 return <div className={`inventory-cell ${item ? 'occupied' : ''}`} key={slot} title={item ? `${item.displayName ?? item.name ?? 'Item'} ×${item.count ?? 1}` : `Empty slot ${slot}`}><small>{slot}</small>{item && <><span>{(item.displayName ?? item.name ?? '?').split(':').pop()?.slice(0, 9)}</span><b>{item.count ?? 1}</b></>}</div>
               })}</div></details>}
+              {!!(selected.telemetry?.equipped_left || selected.telemetry?.equipped_right) && <div className="equipment-grid" aria-label="Equipped turtle tools">
+                <div className="equipment-tile"><span>LEFT EQUIPMENT</span><strong>{equipmentLabel(selected.telemetry.equipped_left)}</strong></div>
+                <div className="equipment-tile"><span>RIGHT EQUIPMENT</span><strong>{equipmentLabel(selected.telemetry.equipped_right)}</strong></div>
+              </div>}
               {Array.isArray(selected.telemetry?.peripherals) && <details className="inventory-panel"><summary>Peripherals · {selected.telemetry.peripherals.length} attached</summary><pre>{JSON.stringify(selected.telemetry.peripherals, null, 2)}</pre></details>}
               <div className="editor-panel"><div className="editor-heading"><div><p className="eyebrow">REMOTE LUA</p><h3>Run a program</h3></div><div className="detail-actions"><button className="secondary-button" disabled={selected.status !== 'online'} onClick={() => void interrupt()}>Stop</button><button className="danger-button" disabled={selected.status !== 'online'} onClick={() => void interrupt(true)}>Emergency stop</button><button className="primary-button run-button" disabled={selected.status !== 'online' || busy || !code.trim()} onClick={() => void runCode()}>{busy ? 'Running…' : '▶ Run'}</button></div></div>
                 <textarea className="lua-editor" aria-label="Lua code" value={code} onChange={(event) => setCode(event.target.value)} spellCheck={false} />

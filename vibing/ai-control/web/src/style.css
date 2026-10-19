@@ -123,6 +123,10 @@ footer b { color: var(--green); font-weight: 400; }
 .inventory-cell small { position: absolute; top: 3px; left: 4px; color: #64705f; font-size: 7px; }
 .inventory-cell span { overflow: hidden; margin-top: 7px; color: #b7c4ae; text-overflow: ellipsis; white-space: nowrap; }
 .inventory-cell b { align-self: end; color: var(--green); font-weight: 400; }
+.equipment-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 9px; margin: 12px 0; }
+.equipment-tile { min-width: 0; border: 1px solid #ffffff12; border-radius: 8px; background: #0c110e8a; padding: 11px; }
+.equipment-tile span { display: block; color: #839080; font: 8px 'DM Mono', monospace; letter-spacing: .04em; }
+.equipment-tile strong { display: block; overflow: hidden; margin-top: 7px; color: #e5ece0; font: 11px 'DM Mono', monospace; text-overflow: ellipsis; white-space: nowrap; }
 .editor-panel { margin-top: 24px; border-top: 1px solid #ffffff15; padding-top: 20px; }
 .editor-heading h3 { margin: 0; font-size: 16px; font-weight: 500; }
 .run-button { width: auto; gap: 14px; padding: 10px 15px; }
