@@ -25,7 +25,7 @@ from sqlalchemy.pool import NullPool
 
 from aicontrol.auth import oidc
 from aicontrol.config import OidcProviderSettings, Settings
-from aicontrol.db.models import ApiToken, Base, OidcFlow, User, UserIdentity
+from aicontrol.db.models import ApiToken, Base, OidcFlow, User, UserIdentity, UserRole, utc_now
 from aicontrol.db.session import get_session
 from aicontrol.main import create_app
 
@@ -78,6 +78,7 @@ def _id_token(private, *, nonce: str, subject: str = "subject-1", email: str = "
         "iss": ISSUER,
         "aud": "client-id",
         "sub": subject,
+        "preferred_username": "testuser",
         "exp": now + timedelta(minutes=3),
         "iat": now,
         "nonce": nonce,
@@ -150,7 +151,7 @@ def test_oidc_login_verifies_signature_and_creates_stable_user(auth_client, monk
     assert response.status_code == 303
     assert auth_client.get("/api/auth/me").status_code == 200
     assert auth_client.get("/api/auth/me").json()["role"] == "user"
-    assert auth_client.get("/api/auth/me").json()["username"].startswith("oidc-test-provider-")
+    assert auth_client.get("/api/auth/me").json()["username"] == "testuser"
     assert auth_client.get("/api/auth/setup-state").json()["setup_required"] is True
     user_id = auth_client.get("/api/auth/me").json()["id"]
     auth_client.post("/api/auth/logout", headers={"x-csrf-token": auth_client.cookies["aic_csrf"]})
@@ -363,6 +364,198 @@ def test_admin_can_change_role_but_cannot_disable_last_admin(auth_client):
     )
     assert promoted.status_code == 200 and promoted.json()["role"] == "admin"
 
+
+def test_oidc_username_collision_requires_explicit_link_without_account_merge(
+    auth_client, monkeypatch, oidc_keys
+):
+    private, jwks = oidc_keys
+    auth_client.app.state.settings.oidc_providers = [_provider()]
+    setup = auth_client.post(
+        "/api/auth/setup", json={"username": "riewest14", "password": "a-local-account-password"}
+    )
+    assert setup.status_code == 201
+    original_user_id = setup.json()["id"]
+    auth_client.post("/api/auth/logout", headers={"x-csrf-token": auth_client.cookies["aic_csrf"]})
+    _mock_discovery(monkeypatch)
+    monkeypatch.setattr(oidc, "_get_json", lambda _: _async(jwks))
+    state = _begin(auth_client)
+    flow = _read_flow(auth_client, state)
+    monkeypatch.setattr(
+        oidc,
+        "_exchange_code",
+        lambda *_: _async({
+            "id_token": _id_token(private, nonce=flow["nonce"], preferred_username="Riewest14")
+        }),
+    )
+    response = _callback(auth_client, state)
+    assert response.status_code == 409
+    assert "explicitly link" in response.json()["detail"]
+
+    async def read_users_and_identities():
+        engine = create_async_engine(auth_client.app.state.test_database_url)
+        factory = async_sessionmaker(engine)
+        async with factory() as session:
+            users = list(await session.scalars(select(User)))
+            identities = list(await session.scalars(select(UserIdentity)))
+        await engine.dispose()
+        return users, identities
+
+    users, identities = asyncio.run(read_users_and_identities())
+    assert len(users) == 1 and users[0].id == original_user_id
+    assert identities == []
+
+
+def test_explicit_link_reclaims_legacy_empty_generated_oidc_account(
+    auth_client, monkeypatch, oidc_keys
+):
+    private, jwks = oidc_keys
+    auth_client.app.state.settings.oidc_providers = [_provider()]
+    setup = auth_client.post(
+        "/api/auth/setup", json={"username": "riewest14", "password": "a-local-account-password"}
+    )
+    local_user_id = setup.json()["id"]
+    subject = "authentik-subject"
+    shadow_username = oidc._generated_username(_provider(), subject)
+    legacy_session_token = "legacy-shadow-session-token"
+
+    async def seed_legacy_shadow():
+        engine = create_async_engine(auth_client.app.state.test_database_url)
+        factory = async_sessionmaker(engine, expire_on_commit=False)
+        async with factory() as session:
+            shadow = User(username=shadow_username, password_hash=None, role=UserRole.USER)
+            shadow.identities.append(UserIdentity(issuer=ISSUER, subject=subject))
+            session.add(shadow)
+            await session.flush()
+            session.add(
+                ApiToken(
+                    user_id=shadow.id,
+                    token_hash=oidc.token_digest(legacy_session_token),
+                    label="web-session:" + oidc.token_digest("legacy-csrf"),
+                    expires_at=utc_now() + timedelta(hours=1),
+                )
+            )
+            await session.commit()
+            shadow_id = shadow.id
+        await engine.dispose()
+        return shadow_id
+
+    shadow_id = asyncio.run(seed_legacy_shadow())
+    _mock_discovery(monkeypatch)
+    csrf = auth_client.cookies["aic_csrf"]
+    start = auth_client.post("/api/auth/oidc/test-provider/link", headers={"x-csrf-token": csrf})
+    assert start.status_code == 200
+    state = parse_qs(urlparse(start.json()["authorization_url"]).query)["state"][0]
+    flow = _read_flow(auth_client, state)
+    monkeypatch.setattr(oidc, "_get_json", lambda _: _async(jwks))
+    monkeypatch.setattr(
+        oidc,
+        "_exchange_code",
+        lambda *_: _async({
+            "id_token": _id_token(
+                private, nonce=flow["nonce"], subject=subject, preferred_username="riewest14"
+            )
+        }),
+    )
+    response = _callback(auth_client, state)
+    assert response.status_code == 303
+    assert auth_client.get("/api/auth/me").json()["id"] == local_user_id
+    old_session_client = TestClient(auth_client.app)
+    old_session_client.cookies.set("aic_session", legacy_session_token)
+    assert old_session_client.get("/api/auth/me").status_code == 401
+
+    async def read_link_state():
+        engine = create_async_engine(auth_client.app.state.test_database_url)
+        factory = async_sessionmaker(engine)
+        async with factory() as session:
+            shadow = await session.get(User, shadow_id)
+            identity = await session.scalar(
+                select(UserIdentity).where(
+                    UserIdentity.issuer == ISSUER, UserIdentity.subject == subject
+                )
+            )
+            target = await session.get(User, local_user_id)
+            assert shadow is not None and shadow.disabled
+            assert identity is not None and target is not None and identity.user_id == target.id
+        await engine.dispose()
+
+    asyncio.run(read_link_state())
+
+
+def test_explicit_link_refuses_legacy_oidc_account_with_computer_resources(
+    auth_client, monkeypatch, oidc_keys
+):
+    from aicontrol.db.models import Computer, ComputerKind
+
+    private, jwks = oidc_keys
+    auth_client.app.state.settings.oidc_providers = [_provider()]
+    local = auth_client.post(
+        "/api/auth/setup", json={"username": "riewest14", "password": "a-local-account-password"}
+    )
+    local_user_id = local.json()["id"]
+    subject = "authentik-owned-device-subject"
+    shadow_username = oidc._generated_username(_provider(), subject)
+
+    async def seed_shadow_with_computer():
+        engine = create_async_engine(auth_client.app.state.test_database_url)
+        factory = async_sessionmaker(engine, expire_on_commit=False)
+        async with factory() as session:
+            shadow = User(username=shadow_username, password_hash=None, role=UserRole.USER)
+            shadow.identities.append(UserIdentity(issuer=ISSUER, subject=subject))
+            session.add(shadow)
+            await session.flush()
+            shadow_id = shadow.id
+            session.add(
+                Computer(
+                    id="protected-shadow-device",
+                    owner_user_id=shadow_id,
+                    label="Do not reassign",
+                    kind=ComputerKind.COMPUTER,
+                )
+            )
+            await session.commit()
+        await engine.dispose()
+        return shadow_id
+
+    shadow_id = asyncio.run(seed_shadow_with_computer())
+    _mock_discovery(monkeypatch)
+    start = auth_client.post(
+        "/api/auth/oidc/test-provider/link",
+        headers={"x-csrf-token": auth_client.cookies["aic_csrf"]},
+    )
+    state = parse_qs(urlparse(start.json()["authorization_url"]).query)["state"][0]
+    flow = _read_flow(auth_client, state)
+    monkeypatch.setattr(oidc, "_get_json", lambda _: _async(jwks))
+    monkeypatch.setattr(
+        oidc,
+        "_exchange_code",
+        lambda *_: _async({
+            "id_token": _id_token(
+                private, nonce=flow["nonce"], subject=subject, preferred_username="riewest14"
+            )
+        }),
+    )
+    response = _callback(auth_client, state)
+    assert response.status_code == 409
+    assert "not an empty generated OIDC account" in response.json()["detail"]
+
+    async def verify_not_moved():
+        engine = create_async_engine(auth_client.app.state.test_database_url)
+        factory = async_sessionmaker(engine)
+        async with factory() as session:
+            shadow = await session.get(User, shadow_id)
+            computer = await session.get(Computer, "protected-shadow-device")
+            identity = await session.scalar(
+                select(UserIdentity).where(
+                    UserIdentity.issuer == ISSUER, UserIdentity.subject == subject
+                )
+            )
+            assert shadow is not None and not shadow.disabled
+            assert computer is not None and computer.owner_user_id == shadow_id
+            assert identity is not None and identity.user_id == shadow_id
+            assert await session.get(User, local_user_id) is not None
+        await engine.dispose()
+
+    asyncio.run(verify_not_moved())
 
 def test_oidc_provider_settings_require_https_and_unique_names():
     from pydantic import ValidationError

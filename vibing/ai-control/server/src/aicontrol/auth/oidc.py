@@ -31,7 +31,24 @@ from aicontrol.auth.sessions import (
     token_digest,
 )
 from aicontrol.config import OidcProviderSettings, Settings
-from aicontrol.db.models import OidcFlow, User, UserIdentity, UserRole, utc_now
+from aicontrol.db.models import (
+    AiProvider,
+    ApiToken,
+    AuditEvent,
+    Computer,
+    ControlGroup,
+    ExecRun,
+    Goal,
+    OidcFlow,
+    Script,
+    ScriptVersion,
+    Share,
+    TeamMember,
+    User,
+    UserIdentity,
+    UserRole,
+    utc_now,
+)
 from aicontrol.db.session import get_session
 
 router = APIRouter(prefix="/api/auth/oidc", tags=["oidc"])
@@ -161,6 +178,62 @@ def _generated_username(provider: OidcProviderSettings, subject: str) -> str:
     provider_part = "".join(character.lower() if character.isalnum() else "-" for character in provider.name)
     subject_part = hashlib.sha256(subject.encode("utf-8")).hexdigest()[:24]
     return f"oidc-{provider_part[:30]}-{subject_part}"[:80]
+
+
+def _preferred_username(claims: dict[str, Any]) -> str | None:
+    value = claims.get("preferred_username")
+    if not isinstance(value, str):
+        return None
+    username = value.strip().casefold()
+    if not username or len(username) > 80 or any(character.isspace() for character in username):
+        return None
+    return username
+
+
+def _username_collision_detail(username: str) -> str:
+    return (
+        f"The identity provider username '{username}' is already in use. "
+        "Sign in to that existing account locally and explicitly link this provider; "
+        "AI Control does not merge accounts by username or email."
+    )
+
+
+async def _is_empty_generated_account(
+    session: AsyncSession,
+    user: User,
+    provider: OidcProviderSettings,
+    identity: UserIdentity,
+) -> bool:
+    if user.password_hash is not None or user.disabled:
+        return False
+    provider_part = "".join(character.lower() if character.isalnum() else "-" for character in provider.name)
+    provider_prefix = f"oidc-{provider_part[:30]}-"
+    subject_suffix = hashlib.sha256(identity.subject.encode("utf-8")).hexdigest()[:24]
+    if user.username != f"{provider_prefix}{subject_suffix}"[:80]:
+        return False
+    identities = await session.scalars(select(UserIdentity.id).where(UserIdentity.user_id == user.id))
+    if set(identities) != {identity.id}:
+        return False
+    resource_queries = (
+        select(Computer.id).where(Computer.owner_user_id == user.id),
+        select(TeamMember.id).where(TeamMember.user_id == user.id),
+        select(ControlGroup.id).where(ControlGroup.owner_user_id == user.id),
+        select(Share.id).where(Share.subject_user_id == user.id),
+        select(Script.id).where(Script.owner_user_id == user.id),
+        select(AiProvider.id).where(AiProvider.owner_user_id == user.id),
+        select(ApiToken.id).where(
+            ApiToken.user_id == user.id,
+            ApiToken.label.not_like("web-session:%"),
+        ),
+        select(ScriptVersion.id).where(ScriptVersion.created_by_user_id == user.id),
+        select(Goal.id).where(Goal.created_by_user_id == user.id),
+        select(ExecRun.id).where(ExecRun.actor_user_id == user.id),
+        select(AuditEvent.id).where(AuditEvent.actor_user_id == user.id),
+    )
+    for query in resource_queries:
+        if await session.scalar(query.limit(1)) is not None:
+            return False
+    return True
 
 
 @router.get("/providers")
@@ -314,7 +387,47 @@ async def callback(
         if active is None or active.user.id != flow.link_user_id:
             raise HTTPException(status_code=401, detail="Sign in again before linking an identity")
         if identity is not None:
-            raise HTTPException(status_code=409, detail="This identity is already linked")
+            if identity.user_id == flow.link_user_id:
+                raise HTTPException(status_code=409, detail="This identity is already linked to this account")
+            previous_user = await session.get(User, identity.user_id)
+            if previous_user is None or not await _is_empty_generated_account(
+                session, previous_user, provider, identity
+            ):
+                raise HTTPException(
+                    status_code=409,
+                    detail=(
+                        "This identity is linked to another account that is not an empty generated OIDC account. "
+                        "It cannot be transferred automatically; ask an administrator to review the account."
+                    ),
+                )
+            previous_user.disabled = True
+            identity.user_id = flow.link_user_id
+            legacy_sessions = await session.scalars(
+                select(ApiToken).where(
+                    ApiToken.user_id == previous_user.id,
+                    ApiToken.label.like("web-session:%"),
+                )
+            )
+            for legacy_session in legacy_sessions:
+                await session.delete(legacy_session)
+            await record(
+                session,
+                action="auth.oidc_identity_reassigned",
+                actor_user_id=flow.link_user_id,
+                target_type="identity",
+                target_id=identity.id,
+                source_ip=request.client.host if request.client else None,
+                details={"provider": provider.name, "disabled_empty_account_id": previous_user.id},
+                commit=False,
+            )
+            try:
+                await session.commit()
+            except IntegrityError:
+                await session.rollback()
+                raise HTTPException(status_code=409, detail="This identity is already linked") from None
+            linked = RedirectResponse("/?identity=linked", status_code=303)
+            linked.delete_cookie(FLOW_COOKIE, path="/api/auth/oidc")
+            return linked
         session.add(
             UserIdentity(
                 user_id=flow.link_user_id,
@@ -349,7 +462,11 @@ async def callback(
     else:
         if not provider.auto_create_users:
             raise HTTPException(status_code=403, detail="Account creation is disabled for this provider")
-        user = User(username=_generated_username(provider, claims["sub"]), role=UserRole.USER)
+        username = _preferred_username(claims) or _generated_username(provider, claims["sub"])
+        existing_username = await session.scalar(select(User).where(User.username == username))
+        if existing_username is not None:
+            raise HTTPException(status_code=409, detail=_username_collision_detail(username))
+        user = User(username=username, role=UserRole.USER)
         user.identities.append(
             UserIdentity(issuer=provider.issuer_url.rstrip("/"), subject=claims["sub"])
         )
@@ -364,7 +481,15 @@ async def callback(
                     UserIdentity.subject == claims["sub"],
                 )
             )
-            user = await session.get(User, identity.user_id) if identity else None
+            if identity is None:
+                existing_username = await session.scalar(select(User).where(User.username == username))
+                if existing_username is not None:
+                    raise HTTPException(
+                        status_code=409,
+                        detail=_username_collision_detail(username),
+                    ) from None
+                raise HTTPException(status_code=401, detail="OIDC sign-in could not be verified") from None
+            user = await session.get(User, identity.user_id)
             if user is None or user.disabled:
                 raise HTTPException(status_code=401, detail="OIDC sign-in could not be verified") from None
 
