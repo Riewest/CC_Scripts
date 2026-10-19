@@ -73,10 +73,14 @@ export function Dashboard({
   onAddComputer,
   onRepairComputer,
   onLogout,
+  onAdmin,
+  isAdmin,
 }: {
   onAddComputer: () => void
   onRepairComputer: (computer: Pick<Computer, 'id' | 'label'>) => void
   onLogout: () => void
+  onAdmin: () => void
+  isAdmin: boolean
 }) {
   const [computers, setComputers] = useState<Computer[]>([])
   const [selectedId, setSelectedId] = useState<string | null>(null)
@@ -89,6 +93,7 @@ export function Dashboard({
   const [notice, setNotice] = useState('')
   const [websocketState, setWebsocketState] = useState('connecting')
   const [copiedPosition, setCopiedPosition] = useState('')
+  const [oidcProviders, setOidcProviders] = useState<string[]>([])
 
   const refreshComputers = useCallback(async () => {
     try {
@@ -109,6 +114,12 @@ export function Dashboard({
   }, [])
 
   useEffect(() => { void refreshComputers() }, [refreshComputers])
+  useEffect(() => {
+    fetch('/api/auth/oidc/providers', { credentials: 'include' })
+      .then((response) => response.ok ? response.json() : [])
+      .then((providers: Array<{ name: string }>) => setOidcProviders(providers.map((provider) => provider.name)))
+      .catch(() => setOidcProviders([]))
+  }, [])
   useEffect(() => {
     if (selectedId) void refreshRuns(selectedId)
     else setRuns([])
@@ -201,12 +212,24 @@ export function Dashboard({
     finally { onLogout() }
   }
 
+  async function linkIdentity(provider: string) {
+    if (!window.confirm(`Link the ${provider} identity to this signed-in account? It will not change account ownership.`)) return
+    try {
+      const response = await fetch(`/api/auth/oidc/${encodeURIComponent(provider)}/link`, {
+        method: 'POST', credentials: 'include', headers: { 'X-CSRF-Token': csrfToken() },
+      })
+      const result = await response.json()
+      if (!response.ok) throw new Error(result.detail ?? 'Could not start identity linking')
+      window.location.assign(result.authorization_url)
+    } catch (reason) { setError(reason instanceof Error ? reason.message : 'Could not start identity linking') }
+  }
+
   return (
     <div className="dashboard-page">
       <header className="topbar">
         <a className="brand" href="#" onClick={(event) => event.preventDefault()}><span className="brand-mark">⌘</span><span>AI Control</span></a>
         <span className={`connection ${websocketState === 'live' ? '' : 'dimmed'}`}><i /> {websocketState === 'live' ? 'Live connection' : websocketState}</span>
-        <div className="topbar-actions"><button className="nav-action" onClick={onAddComputer}>＋ Add computer</button><button className="text-button" onClick={() => void logout()}>Sign out</button></div>
+        <div className="topbar-actions">{isAdmin && <button className="text-button" onClick={onAdmin}>Admin</button>}{oidcProviders.map((provider) => <button className="text-button" key={provider} onClick={() => void linkIdentity(provider)}>Link {provider}</button>)}<button className="nav-action" onClick={onAddComputer}>＋ Add computer</button><button className="text-button" onClick={() => void logout()}>Sign out</button></div>
       </header>
       <main className="dashboard-content">
         <div className="dashboard-heading"><div><p className="eyebrow">YOUR CONTROL ROOM</p><h1 className="dashboard-title">Computer fleet</h1><p className="intro dashboard-intro">Devices connected to your account, ready when you are.</p></div><div className="fleet-count"><strong>{onlineCount}</strong><span>ONLINE <b>·</b> {computers.length} TOTAL</span></div></div>

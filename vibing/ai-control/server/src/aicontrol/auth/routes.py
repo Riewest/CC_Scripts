@@ -20,6 +20,7 @@ from aicontrol.auth.sessions import (
     create_browser_session,
     current_user,
     require_csrf,
+    secure_cookie_request,
     set_auth_cookies,
     user_payload,
 )
@@ -49,7 +50,7 @@ def _authenticated_response(
         response,
         session_token,
         csrf_token,
-        secure=request.url.scheme == "https",
+        secure=secure_cookie_request(request),
     )
     return response
 
@@ -183,7 +184,7 @@ async def logout(
 ) -> Response:
     await session.delete(principal.session)
     await session.commit()
-    clear_auth_cookies(response, secure=request.url.scheme == "https")
+    clear_auth_cookies(response, secure=secure_cookie_request(request))
     response.status_code = status.HTTP_204_NO_CONTENT
     return response
 
@@ -215,6 +216,6 @@ async def change_password(
     for browser_session in sessions:
         await session.delete(browser_session)
     await session.commit()
-    clear_auth_cookies(response, secure=request.url.scheme == "https")
+    clear_auth_cookies(response, secure=secure_cookie_request(request))
     response.status_code = status.HTTP_204_NO_CONTENT
     return response

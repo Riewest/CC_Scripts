@@ -94,6 +94,19 @@ class UserIdentity(TimestampMixin, Base):
     user: Mapped[User] = relationship(back_populates="identities")
 
 
+class OidcFlow(Base):
+    __tablename__ = "oidc_flows"
+    __table_args__ = (Index("ix_oidc_flows_expires_at", "expires_at"),)
+
+    state_hash: Mapped[str] = mapped_column(String(64), primary_key=True)
+    browser_hash: Mapped[str] = mapped_column(String(64), nullable=False)
+    provider: Mapped[str] = mapped_column(String(80), nullable=False)
+    nonce: Mapped[str] = mapped_column(String(128), nullable=False)
+    code_verifier: Mapped[str] = mapped_column(String(128), nullable=False)
+    link_user_id: Mapped[str | None] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"))
+    expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+
+
 class Team(TimestampMixin, Base):
     __tablename__ = "teams"
     __table_args__ = (Index("ix_teams_slug", "slug", unique=True),)

@@ -1,5 +1,5 @@
 # REQ-009 OIDC login and roles
-Status: todo | Milestone: M2 | Depends: REQ-006
+Status: done | Milestone: M2 | Depends: REQ-006
 
 ## Goal
 Generic OIDC login (Google, GitHub via compatible provider, Keycloak, Authentik, etc.) alongside local auth, and a working admin/user role model.
@@ -12,12 +12,12 @@ Generic OIDC login (Google, GitHub via compatible provider, Keycloak, Authentik,
 - Roles: `admin` can manage users, teams, settings; `user` default. Admin UI for user list, role change, disable user.
 
 ## Acceptance criteria
-- [ ] Login via a configured OIDC provider creates or logs in the right user.
-- [ ] State/nonce/PKCE failures are rejected.
-- [ ] Account linking requires an authenticated session.
-- [ ] Disabled users cannot log in by any method; their sessions end.
-- [ ] Admin-only endpoints return 403 to normal users.
-- [ ] docs/auth.md has provider setup examples.
+- [x] Login via a configured OIDC provider creates or logs in the right user (mocked signed-JWKS flow covers both first login and returning identity).
+- [x] State/nonce/PKCE failures are rejected (browser-bound one-use state, missing browser cookie, wrong nonce, bad signature, invalid expiry, and PKCE S256 challenge tests).
+- [x] Account linking requires an authenticated session and explicit CSRF-protected initiation; linking never matches by email.
+- [x] Disabled users cannot log in by any method; their sessions and stored tokens are revoked, and live UI sockets revalidate within 15 seconds.
+- [x] Admin-only endpoints return 403 to normal users; administrator user/role/disable controls protect the last active administrator.
+- [x] docs/auth.md has provider setup examples and deployment/security notes.
 
 ## Test plan
 pytest with a mocked OIDC provider (discovery, JWKS, token endpoint): success, bad nonce, bad signature, domain restriction, link flow.

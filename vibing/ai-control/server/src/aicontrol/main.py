@@ -6,6 +6,8 @@ from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 
 from aicontrol.api.computers import router as computers_router
+from aicontrol.auth.admin import router as admin_router
+from aicontrol.auth.oidc import router as oidc_router
 from aicontrol.auth.routes import router as auth_router
 from aicontrol.auth.websocket import router as auth_websocket_router
 from aicontrol.client_files import router as client_router
@@ -35,6 +37,8 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.state.gateway = WebSocketGateway(app_settings)
     app.include_router(gateway_router)
     app.include_router(auth_router)
+    app.include_router(oidc_router)
+    app.include_router(admin_router)
     app.include_router(auth_websocket_router)
     app.include_router(client_router)
     app.include_router(computers_router)

@@ -2,6 +2,7 @@ import { FormEvent, useEffect, useState } from 'react'
 
 export function AuthPage({ onAuthenticated }: { onAuthenticated: () => void }) {
   const [setupRequired, setSetupRequired] = useState(false)
+  const [providers, setProviders] = useState<string[]>([])
   const [loading, setLoading] = useState(true)
   const [submitting, setSubmitting] = useState(false)
   const [username, setUsername] = useState('')
@@ -9,11 +10,16 @@ export function AuthPage({ onAuthenticated }: { onAuthenticated: () => void }) {
   const [error, setError] = useState('')
 
   useEffect(() => {
-    fetch('/api/auth/setup-state', { credentials: 'include' })
-      .then(async (response) => {
-        if (!response.ok) throw new Error('Could not load authentication setup state')
-        const state = await response.json()
+    Promise.all([
+      fetch('/api/auth/setup-state', { credentials: 'include' }),
+      fetch('/api/auth/oidc/providers', { credentials: 'include' }),
+    ])
+      .then(async ([setupResponse, providerResponse]) => {
+        if (!setupResponse.ok || !providerResponse.ok) throw new Error('Could not load authentication setup state')
+        const state = await setupResponse.json()
+        const configuredProviders: Array<{ name: string }> = await providerResponse.json()
         setSetupRequired(state.setup_required)
+        setProviders(configuredProviders.map((provider) => provider.name))
       })
       .catch((reason: unknown) => setError(reason instanceof Error ? reason.message : 'Could not connect'))
       .finally(() => setLoading(false))
@@ -56,6 +62,7 @@ export function AuthPage({ onAuthenticated }: { onAuthenticated: () => void }) {
         <button className="primary-button" disabled={submitting}>{submitting ? 'Please wait…' : setupRequired ? 'Create administrator' : 'Sign in'}<span>→</span></button>
         {setupRequired && <p className="pairing-footnote">Use a unique password with at least 12 characters. This first account becomes the administrator. If you paired devices before setting up login, use the same owner username to keep those devices on your account.</p>}
       </form>
+      {providers.length > 0 && <div className="oidc-options"><p className="field-label">OR CONTINUE WITH</p>{providers.map((provider) => <a className="secondary-button oidc-button" key={provider} href={`/api/auth/oidc/${encodeURIComponent(provider)}/login`}>Continue with {provider}<span>→</span></a>)}</div>}
     </section>
   )
 }

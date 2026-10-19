@@ -160,3 +160,8 @@ def clear_auth_cookies(response, *, secure: bool) -> None:
 
 def user_payload(user: User) -> dict[str, str]:
     return _user_response(user)
+
+
+def secure_cookie_request(request: Request) -> bool:
+    settings = request.app.state.settings
+    return request.url.scheme == "https" or settings.public_url.startswith("https://")

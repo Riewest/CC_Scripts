@@ -2,26 +2,43 @@ import React, { useCallback, useEffect, useState } from 'react'
 import ReactDOM from 'react-dom/client'
 import { AddComputer } from './pages/AddComputer'
 import { AuthPage } from './pages/AuthPage'
+import { AdminUsers } from './pages/AdminUsers'
 import { Dashboard } from './pages/Dashboard'
 import './style.css'
 
 function App() {
   const [authState, setAuthState] = useState<'checking' | 'signed-out' | 'signed-in'>('checking')
   const [showAddComputer, setShowAddComputer] = useState(false)
+  const [showAdmin, setShowAdmin] = useState(false)
+  const [isAdmin, setIsAdmin] = useState(false)
   const [repairTarget, setRepairTarget] = useState<{ id: string; label: string } | null>(null)
   const handleLogout = useCallback(() => setAuthState('signed-out'), [])
   const handleAddComputer = useCallback(() => setShowAddComputer(true), [])
 
   useEffect(() => {
     fetch('/api/auth/me', { credentials: 'include' })
-      .then((response) => setAuthState(response.ok ? 'signed-in' : 'signed-out'))
+      .then(async (response) => {
+        if (!response.ok) { setAuthState('signed-out'); return }
+        const user = await response.json()
+        setIsAdmin(user.role === 'admin')
+        setAuthState('signed-in')
+      })
       .catch(() => setAuthState('signed-out'))
   }, [])
 
+  async function handleAuthenticated() {
+    const response = await fetch('/api/auth/me', { credentials: 'include' })
+    if (!response.ok) { setAuthState('signed-out'); return }
+    const user = await response.json()
+    setIsAdmin(user.role === 'admin')
+    setAuthState('signed-in')
+  }
+
   if (authState === 'checking') return <main className="shell"><div className="auth-loading">Loading AI Control…</div></main>
-  if (authState === 'signed-out') return <main className="shell"><AuthPage onAuthenticated={() => setAuthState('signed-in')} /></main>
+  if (authState === 'signed-out') return <main className="shell"><AuthPage onAuthenticated={() => void handleAuthenticated()} /></main>
+  if (showAdmin) return <main className="shell"><AdminUsers onBack={() => setShowAdmin(false)} /></main>
   if (showAddComputer || repairTarget) return <main className="shell"><AddComputer onBack={() => { setShowAddComputer(false); setRepairTarget(null) }} repairComputerId={repairTarget?.id} repairLabel={repairTarget?.label} /></main>
-  return <main className="shell"><Dashboard onAddComputer={handleAddComputer} onRepairComputer={(computer) => setRepairTarget(computer)} onLogout={handleLogout} /></main>
+  return <main className="shell"><Dashboard onAddComputer={handleAddComputer} onRepairComputer={(computer) => setRepairTarget(computer)} onLogout={handleLogout} onAdmin={() => setShowAdmin(true)} isAdmin={isAdmin} /></main>
 }
 
 ReactDOM.createRoot(document.getElementById('root')!).render(

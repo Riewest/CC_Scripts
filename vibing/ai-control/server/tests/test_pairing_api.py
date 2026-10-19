@@ -43,7 +43,7 @@ def pairing_client(tmp_path: Path) -> Iterator[TestClient]:
         )
     )
     app.dependency_overrides[get_session] = override_session
-    with TestClient(app) as client:
+    with TestClient(app, base_url="https://control.example.test") as client:
         yield client
     asyncio.run(engine.dispose())
 

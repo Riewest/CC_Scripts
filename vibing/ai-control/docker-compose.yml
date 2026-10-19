@@ -20,6 +20,7 @@ services:
       AIC_ALLOW_SIGNUP: ${AIC_ALLOW_SIGNUP:-false}
       AIC_PUBLIC_URL: ${AIC_PUBLIC_URL:-http://localhost:8000}
       AIC_SECRET_ENCRYPTION_KEY: ${AIC_SECRET_ENCRYPTION_KEY:-}
+      AIC_OIDC_PROVIDERS: ${AIC_OIDC_PROVIDERS:-[]}
 
 volumes:
   ai-control-data:

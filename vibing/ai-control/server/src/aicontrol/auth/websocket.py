@@ -4,7 +4,7 @@ from typing import Annotated
 from fastapi import APIRouter, Depends, WebSocket, WebSocketDisconnect
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from aicontrol.auth.sessions import authenticate_websocket
+from aicontrol.auth.sessions import SESSION_COOKIE, authenticate_websocket, lookup_session
 from aicontrol.db.models import Computer
 from aicontrol.db.session import get_session
 from aicontrol.gateway.registry import GatewayEvent
@@ -34,6 +34,7 @@ async def ui_websocket(
                 done, pending = await asyncio.wait(
                     tasks,
                     return_when=asyncio.FIRST_COMPLETED,
+                    timeout=15,
                 )
             except asyncio.CancelledError:
                 for task in tasks:
@@ -43,6 +44,14 @@ async def ui_websocket(
             for task in pending:
                 task.cancel()
             await asyncio.gather(*pending, return_exceptions=True)
+            if not done:
+                principal = await lookup_session(
+                    websocket.cookies.get(SESSION_COOKIE), session
+                )
+                if principal is None:
+                    await websocket.close(code=4401, reason="Session expired or disabled")
+                    return
+                continue
             if receive_task in done:
                 receive_task.result()
             if event_task in done:
