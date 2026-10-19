@@ -42,14 +42,11 @@ async def ui_websocket(
                 raise
             for task in pending:
                 task.cancel()
-            event_result, receive_result = await asyncio.gather(*tasks, return_exceptions=True)
+            await asyncio.gather(*pending, return_exceptions=True)
             if receive_task in done:
-                if isinstance(receive_result, BaseException):
-                    raise receive_result
+                receive_task.result()
             if event_task in done:
-                if isinstance(event_result, BaseException):
-                    raise event_result
-                event: GatewayEvent = event_result
+                event: GatewayEvent = event_task.result()
                 computer = await session.get(Computer, event.computer_id)
                 if computer is not None and computer.owner_user_id == user.id:
                     payload = {

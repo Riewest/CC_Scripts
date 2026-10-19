@@ -91,6 +91,15 @@ def test_exec_endpoint_runs_code_persists_result_and_returns_output(gateway_cont
         cc.send_json(
             {
                 "v": 1,
+                "type": "exec_started",
+                "reply_to": request["id"],
+                "data": {"name": "<remote>", "started_at": "12345"},
+            }
+        )
+        assert caller.is_alive(), "exec_started must not complete the execution request"
+        cc.send_json(
+            {
+                "v": 1,
                 "type": "exec_result",
                 "reply_to": request["id"],
                 "data": {

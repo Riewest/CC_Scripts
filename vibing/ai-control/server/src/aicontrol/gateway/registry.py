@@ -13,6 +13,7 @@ from aicontrol.protocol.models import (
     ErrorMessage,
     EventMessage,
     ExecResultMessage,
+    ExecStartedMessage,
     FsResultMessage,
     HeartbeatMessage,
     PeripheralResultMessage,
@@ -26,6 +27,7 @@ logger = logging.getLogger(__name__)
 CLIENT_MESSAGE_TYPES = (
     HeartbeatMessage,
     TelemetryMessage,
+    ExecStartedMessage,
     ExecResultMessage,
     EventMessage,
     TerminalFrameMessage,
@@ -151,13 +153,14 @@ class GatewayConnection:
         event_bus: EventBus,
         session: AsyncSession,
     ) -> None:
-        if message.reply_to:
+        if message.reply_to and not isinstance(message, ExecStartedMessage):
             future = self.pending.get(message.reply_to)
             if future is not None and not future.done():
                 future.set_result(message)
 
         event_name = {
             "telemetry": "telemetry",
+            "exec_started": "exec_started",
             "exec_result": "exec_result",
             "event": "event",
             "term_frame": "term_frame",

@@ -338,6 +338,14 @@ def test_fake_client_exec_request_round_trip_over_websocket(gateway_context) -> 
         cc.send_json(
             {
                 "v": 1,
+                "type": "exec_started",
+                "reply_to": request["id"],
+                "data": {"name": "test", "started_at": "12345"},
+            }
+        )
+        cc.send_json(
+            {
+                "v": 1,
                 "type": "exec_result",
                 "reply_to": request["id"],
                 "data": {"ok": True, "return_values": [42], "duration_ms": 2},
