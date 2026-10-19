@@ -21,7 +21,10 @@ Status: pending — M2 implementation and automated validation are complete; STO
 
 ## Real OIDC provider
 
-- From a signed-out browser, sign in via a configured provider and confirm the expected account is authenticated.
+- Configure the existing Authentik instance using [the Authentik setup steps](../../docs/auth.md#authentik-setup): create an OAuth2/OIDC application/provider, use the default per-provider issuer, configure a confidential authorization-code client with an RSA signing key, register the exact HTTPS callback, assign a test user/group, set `AIC_PUBLIC_URL` and `AIC_OIDC_PROVIDERS`, then recreate the app container without deleting its volume.
+- Before login, verify Authentik's discovery document for the configured issuer is reachable from AI Control and returns the same issuer plus HTTPS authorization, token and JWKS endpoints. Do not share the client secret or callback authorization code.
+- From a signed-out browser, choose **Continue with authentik** and confirm the test account is authenticated as a normal `user`. Provider-created usernames are generated from the stable provider subject; verify `/api/auth/me` shows the expected account and a subsequent login returns the same user ID.
+- While signed into the intended destination account, test **Link authentik** with explicit confirmation; verify the provider identity is linked only to that account. Do not expect email matching to link accounts.
 - Reject an unknown email as an account-link shortcut: an identity is only linked after signing in to the destination account and using the explicit confirmation flow.
 - Confirm a disabled test account is denied by both local and OIDC login.
 - Do not use or link a production identity unless intended.
